@@ -1032,7 +1032,7 @@ error:
 
 static TEE_Result trng_kat_test_v3(struct versal_trng *trng)
 {
-
+	IMSG("trng_kat_test_v3");
 #define XTRNGPSX_EXAMPLE_SEEDLIFE			12U
 #define XTRNGPSX_EXAMPLE_DFLENMUL			4U
 #define XTRNGPSX_EXAMPLE_RESEED_DFLENMUL	3U
@@ -1057,29 +1057,37 @@ static TEE_Result trng_kat_test_v3(struct versal_trng *trng)
 			.IsBlocking = FALSE,
 	};
 
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	/*
 	 * Initialize the TRNGPSX driver so that it's ready to use look up
 	 * configuration in the config table, then initialize it.
 	 */
-	 Config = XTrngpsx_LookupConfig(XTRNGPSX_PMC_DEVICE);
-	 if (NULL == Config) {
+
+	IMSG("XTRNGPSX_PMC_DEVICE = 0x%08" PRIx32, XTRNGPSX_PMC_DEVICE);
+	Config = XTrngpsx_LookupConfig(XTRNGPSX_PMC_DEVICE);
+	if (NULL == Config) {
 		IMSG("LookupConfig Failed \n\r");
 		goto END;
-	 }
- 
-	 /* Initialize the TRNGPSX driver so that it is ready to use. */
-	 Status = XTrngpsx_CfgInitialize(&Trngpsx, Config, Config->BaseAddress);
-	 if (Status != XST_SUCCESS) {
+	}
+
+	IMSG("Config->BaseAddress = 0x%08" PRIx32, Config->BaseAddress);
+	//Force BaseAddress
+	Config->BaseAddress = trng->cfg.addr;
+	IMSG("Config->BaseAddress = 0x%08" PRIx32, Config->BaseAddress);
+
+ 	IMSG("%s %d\n", __func__, __LINE__);
+	/* Initialize the TRNGPSX driver so that it is ready to use. */
+	Status = XTrngpsx_CfgInitialize(&Trngpsx, Config, Config->BaseAddress);
+	if (Status != XST_SUCCESS) {
 		IMSG("CfgInitialize Failed, Status: 0x%08x\n\r", Status);
 		goto END;
-	 }
- 
-	 Status = XTrngpsx_PreOperationalSelfTests(&Trngpsx);
-	 if (Status != XST_SUCCESS) {
+	}
+ 	IMSG("%s %d\n", __func__, __LINE__);
+	Status = XTrngpsx_PreOperationalSelfTests(&Trngpsx);
+	if (Status != XST_SUCCESS) {
 		IMSG("KAT Failed, Status: 0x%08x\n\r", Status);
 		goto END;
-	 }
+	}
 
 	Status = XST_SUCCESS;
 END:

@@ -81,10 +81,16 @@ XTrngpsx_Config *XTrngpsx_LookupConfig(UINTPTR BaseAddress)
 
 	/* Checks all the instances */
 	for (Index = 0U; XTrngpsx_ConfigTable[Index].Name != NULL; Index++) {
-		if ((XTrngpsx_ConfigTable[Index].BaseAddress == BaseAddress) || !BaseAddress) {
+		if(!BaseAddress)
+		{
+			Trngpsx_ConfigTable[Index].BaseAddress = BaseAddress;
 			CfgPtr = &XTrngpsx_ConfigTable[Index];
 			break;
 		}
+		// if ((XTrngpsx_ConfigTable[Index].BaseAddress == BaseAddress) || !BaseAddress) {
+			// CfgPtr = &XTrngpsx_ConfigTable[Index];
+			// break;
+		// }
 	}
 
 	return CfgPtr;
