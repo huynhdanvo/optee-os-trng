@@ -170,6 +170,17 @@ static unsigned char sbx3[256];
 static unsigned char schedule[BLK_SIZE * (MAX_ROUNDS + 1)];
 static unsigned int rounds;
 
+static void dump_trng_usr_cfg(struct trng_usr_cfg conf){
+	IMSG("Mode = %d",conf.mode);
+	IMSG("SeedLife = %d",conf.seed_life);
+	IMSG("PredResistance = %d",conf.predict_en);
+	IMSG("personalization string = %d",conf.pstr_en);
+	IMSG("iseed_en = %d",conf.iseed_en);
+	IMSG("df_disable = %d",conf.df_disable);
+	IMSG("dfmul = %d",conf.dfmul);
+}
+
+
 static void rota4(uint8_t *a, uint8_t *b, uint8_t *c, uint8_t *d)
 {
 	uint8_t t = *a;
@@ -1165,6 +1176,8 @@ static TEE_Result trng_kat_test_v2(struct versal_trng *trng)
 
 	if (trng_instantiate(trng, &tests))
 		goto error;
+
+	dump_trng_usr_cfg(tests);
 
 	if (trng_reseed(trng, reseed_entropy, 7))
 		goto error;

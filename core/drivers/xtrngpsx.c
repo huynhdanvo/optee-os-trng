@@ -102,6 +102,17 @@ static int wait_for_event(vaddr_t reg, uint32_t mask, uint32_t expected, uint32_
 	return -1;
 }
 
+static void dump_XTrngpsx_UserConfig(XTrngpsx_UserConfig conf){
+	IMSG("Mode = %d",conf.Mode);
+	IMSG("SeedLife = %d",conf.SeedLife);
+	IMSG("AdaptPropTestCutoff = %d",conf.AdaptPropTestCutoff);
+	IMSG("RepCountTestCutoff = %d",conf.RepCountTestCutoff);
+	IMSG("DFLength = %d",conf.DFLength);
+	IMSG("PredResistance = %d",conf.PredResistance);
+	IMSG("IsBlocking = %d",conf.IsBlocking);
+}
+
+
 /**************************************************************************************************/
 /**
  * @brief
@@ -849,6 +860,7 @@ static int XTrngpsx_ReseedInternal(XTrngpsx_Instance *InstancePtr, const u8 *See
 	volatile int Status = XST_FAILURE;
 	u32 PersMask = TRNG_CTRL_PERSODISABLE_MASK;
 	IMSG("%s %d\n", __func__, __LINE__);
+	dump_XTrngpsx_UserConfig(InstancePtr->UserCfg);
 	/* Configure DF Len */
 	Status = XTrngpsx_CfgDfLen(InstancePtr, DLen);
 	if (Status != XST_SUCCESS) {
