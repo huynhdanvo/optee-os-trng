@@ -103,7 +103,6 @@
 #define TRNG_CTRL_3_DLEN_DEFVAL		0x9
 #define TRNG_CTRL_4			0x14
 #endif
-
 #define TRNGPSX_DF_NUM_OF_BYTES_BEFORE_MIN_700CLKS_WAIT	8U /**< Number of bytes to be written before wait */
 #define TRNGPSX_PERS_STRING_LEN_IN_WORDS		12U	/**< Personalization string length in words */
 #define TRNGPSX_PERS_STRING_LEN_IN_BYTES		48U	/**< Personalization string length in bytes */
@@ -710,7 +709,11 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 #if defined(CFG_VERSAL_RNG_DRV_V2)
 	/* Configure DF Len */
 	uint32_t PersMask = TRNG_CTRL_PERSODISABLE_MASK;
-	if (trng->cfg.version == TRNG_V2){
+	//XTrngpsx_CfgDfLen
+	if (trng->cfg.version == TRNG_V2)
+	{
+		IMSG("TRNG_CTRL_3_DLEN_MASK = 0x%08" PRIx32, TRNG_CTRL_3_DLEN_MASK);
+		IMSG("(mul << TRNG_CTRL_3_DLEN_SHIFT) = 0x%08" PRIx32, mul << TRNG_CTRL_3_DLEN_SHIFT);
 		trng_write32_v2(trng->cfg.addr + TRNG_CTRL_3, TRNG_CTRL_3_DLEN_MASK, (mul << TRNG_CTRL_3_DLEN_SHIFT));
 	}
 
@@ -719,32 +722,7 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		trng_write_perstr(trng, str);
 		PersMask = TRNG_CTRL_PERSODISABLE_DEFVAL;
 	}
-
-	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
-
-	/* DRNG Mode */
-	if (seed != NULL) {
-		/* Enable TST mode and set PRNG mode for reseed operation*/
-		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK, TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK);
-
-		/* Start reseed operation */
-		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
-		
-		/* For writing seed as an input to DF, PRNG start needs to be set */
-		trng_write_seed(trng, seed, mul);
-	} 
-	else { /* HTRNG Mode */
-		/* Enable ring oscillators for random seed source */
-		trng_write32_v2(trng->cfg.addr + TRNG_OSC_EN, TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
-
-		/* Enable TRSSEN and set PRNG mode for reseed operation */
-		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TRSSEN_MASK | TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK);
-	
-		/* Start reseed operation */
-		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
-	}
-
-	trng->stats.elapsed_seed_life = 0;
+	IMSG("%s %d\n", __func__, __LINE__);
 #endif
 
 	switch (trng->usr_cfg.mode) {
@@ -790,6 +768,7 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 	// }
 #if defined(CFG_VERSAL_RNG_DRV_V2)
 	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
+	IMSG("%s %d\n", __func__, __LINE__);
 	/* DRNG Mode */
 	if (seed != NULL) {
 		/* Enable TST mode and set PRNG mode for reseed operation*/
@@ -875,6 +854,7 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 		if (trng_reseed_internal_df(trng, eseed, str))
 			goto error;
 	}
+	IMSG("%s %d\n", __func__, __LINE__);
 #ifndef CFG_VERSAL_RNG_DRV_V2
 	trng_write32(trng->cfg.addr, TRNG_CTRL,
 		     PRNGMODE_RESEED | TRNG_CTRL_PRNGXS_MASK);
@@ -895,6 +875,7 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 
 	trng_clrset32(trng->cfg.addr, TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, 0);
 #endif
+	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -976,6 +957,7 @@ static TEE_Result trng_instantiate(struct versal_trng *trng,
 	}
 
 	trng->status = TRNG_HEALTHY;
+	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -1011,9 +993,12 @@ static TEE_Result trng_reseed(struct versal_trng *trng, uint8_t *eseed,
 	if (eseed && !memcmp(eseed, trng->usr_cfg.init_seed, trng->len))
 		goto error;
 
+
 #if defined(CFG_VERSAL_RNG_DRV_V2)
+	IMSG("%s %d\n", __func__, __LINE__);
 	/* Wait for reseed operation and check CTF flag */
 	trng_wait_for_event(trng->cfg.addr, TRNG_STATUS, TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK, TRNG_RESEED_TIMEOUT);
+	IMSG("%s %d\n", __func__, __LINE__);
 #endif
 	if (trng_reseed_internal(trng, eseed, NULL, mul))
 		goto error;
