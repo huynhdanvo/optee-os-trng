@@ -104,6 +104,17 @@
 #define TRNG_CTRL_4			0x14
 #endif
 
+#define TRNGPSX_PERS_STRING_LEN_IN_WORDS	12U	/**< Personalization string length in words */
+#define TRNGPSX_PERS_STRING_LEN_IN_BYTES	48U	/**< Personalization string length in bytes */
+#define TRNGPSX_WORD_LEN_IN_BYTES		4U	     /**< Word length in bytes */
+#define TRNGPSX_BYTE_LEN_IN_BITS		8U	     /**< Byte length in bits */
+#define TRNG_PER_STRNG_11    (0x000000ACU)
+#define TRNGPSX_DF_2CLKS_WAIT					2U     /** < delay after 1byte */
+#define TRNGPSX_DF_NUM_OF_BYTES_BEFORE_MIN_700CLKS_WAIT	8U /**< Number of bytes to be written before wait */
+#define TRNGPSX_BLOCK_LEN_IN_BYTES		16U	     /**< TRNG block length length in bytes */
+#define TRNGPSX_DF_700CLKS_WAIT				10U    /** < delay after 4bytes */
+
+
 #define TRNG_EXT_SEED_0			0x40
 /*
  * Below registers are not directly referenced in driver but are accessed
@@ -149,8 +160,8 @@
 #define TRNG_REG_SIZE		32
 #define TRNG_BYTES_PER_REG	4
 #define TRNG_MAX_QCNT		4
-#define TRNG_RESEED_TIMEOUT	15000
 #define TRNG_GENERATE_TIMEOUT	8000
+#define TRNG_RESEED_TIMEOUT		1500000U /**< Reseed timeout in micro-seconds */
 #define TRNG_MIN_DFLENMULT	2
 #define TRNG_MAX_DFLENMULT	9
 #define PRNGMODE_RESEED		0
@@ -453,9 +464,90 @@ static void trng_write32(vaddr_t addr, size_t off, uint32_t val)
 	io_write32(addr + off, val);
 }
 
+static int trng_write32_v2(vaddr_t addr, uint32_t mask, uint32_t value)
+{
+	int Status = 1;
+	uint32_t ReadReg;
+	u32 Val;
+
+	IMSG("mask = 0x%08" PRIx32, mask);
+	IMSG("val = 0x%08" PRIx32, value);
+
+	Val = io_read32(addr);
+	Val = (Val & (~mask)) | (mask & value);
+	io_write32(addr, Val);
+
+	/* verify value written to specified address */
+	ReadReg = io_read32(addr) & mask;
+
+	if (ReadReg == (mask & value)) {
+		Status = 0;
+	}
+
+	return Status;
+}
+
 static void trng_clrset32(vaddr_t addr, size_t off, uint32_t mask, uint32_t val)
 {
 	io_clrsetbits32(addr + off, mask, mask & val);
+}
+
+
+static int trng_write_perstr(const struct versal_trng *trng, const uint8_t *perstr)
+{
+	int status = 1;
+	volatile u8 idx = 0;
+	uint8_t cnt = 0;
+	uint32_t regval =0;
+
+	for(idx = 0; idx < TRNGPSX_PERS_STRING_LEN_IN_WORDS; idx++)
+	{
+		regval = 0;
+		for (cnt = 0; cnt < TRNGPSX_WORD_LEN_IN_BYTES; cnt++) 
+		{
+			regval = (regval << TRNGPSX_BYTE_LEN_IN_BITS) | perstr[(idx * TRNGPSX_WORD_LEN_IN_BYTES) + cnt];
+		}
+
+		trng_write32(trng->cfg.addr, (TRNG_PER_STRNG_11 - (idx * TRNGPSX_WORD_LEN_IN_BYTES)), regval);
+	}
+
+	if (idx == TRNGPSX_PERS_STRING_LEN_IN_WORDS) {
+		status = 0;
+	}
+
+	return status;
+}
+
+static int trng_write_seed(const struct versal_trng *trng, const uint8_t *seed, uint8_t dlen) {
+	volatile int status = 1;
+	uint32_t seed_len = (dlen + 1U) * TRNGPSX_BLOCK_LEN_IN_BYTES;
+	volatile u32 idx = 0U;
+	uint8_t cnt = 0U;
+	uint32_t bit = 0U;
+	uint8_t seed_construct = 0U;
+
+	while (idx < seed_len) {
+		seed_construct = 0U;
+		for (cnt = 0; cnt < TRNGPSX_BYTE_LEN_IN_BITS; cnt++) {
+			bit = (uint32_t)(seed[idx] >> (TRNGPSX_BYTE_LEN_IN_BITS - 1U - cnt)) & 0x01U;
+			trng_write32(trng->cfg.addr, TRNG_CTRL_4, bit);
+			seed_construct = (uint8_t)((seed_construct << 1U) | (uint8_t)bit);
+		}
+		if (seed_construct != seed[idx]) {
+			goto END;
+		}
+		udelay(TRNGPSX_DF_2CLKS_WAIT);
+		if ((idx % TRNGPSX_DF_NUM_OF_BYTES_BEFORE_MIN_700CLKS_WAIT) == 0U) {
+			udelay(TRNGPSX_DF_700CLKS_WAIT);
+		}
+		idx++;
+	}
+	if (idx == seed_len) {
+		status = 0;
+	}
+
+END:
+	return status;
 }
 
 static void trng_write32_range(const struct versal_trng *trng, uint32_t start,
@@ -617,15 +709,23 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 	uint8_t *seed = NULL;
 	/* Configure DF Len */
 #if defined(CFG_VERSAL_RNG_DRV_V2)
+#define TRNG_CTRL_PERSODISABLE_MASK    0x00000400U
+#define TRNG_CTRL_PERSODISABLE_DEFVAL  0x0U
+	uint32_t PersMask = TRNG_CTRL_PERSODISABLE_MASK;
 	//XTrngpsx_CfgDfLen
 	if (trng->cfg.version == TRNG_V2)
 	{
-	IMSG("TRNG_CTRL_3_DLEN_MASK = 0x%08" PRIx32, TRNG_CTRL_3_DLEN_MASK);
-	IMSG("(mul << TRNG_CTRL_3_DLEN_SHIFT) = 0x%08" PRIx32, mul << TRNG_CTRL_3_DLEN_SHIFT);
-		// trng_clrset32(trng->cfg.addr, TRNG_CTRL_3,
-		// 	      TRNG_CTRL_3_DLEN_MASK, TRNG_CTRL_3_DLEN_DEFVAL);
-		trng_clrset32(trng->cfg.addr, TRNG_CTRL_3, TRNG_CTRL_3_DLEN_MASK, (mul << TRNG_CTRL_3_DLEN_SHIFT));
+		IMSG("TRNG_CTRL_3_DLEN_MASK = 0x%08" PRIx32, TRNG_CTRL_3_DLEN_MASK);
+		IMSG("(mul << TRNG_CTRL_3_DLEN_SHIFT) = 0x%08" PRIx32, mul << TRNG_CTRL_3_DLEN_SHIFT);
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL_3, TRNG_CTRL_3_DLEN_MASK, (mul << TRNG_CTRL_3_DLEN_SHIFT));
 	}
+
+	if (str != NULL)
+	{
+		trng_write_perstr(trng, str);
+		PersMask = TRNG_CTRL_PERSODISABLE_DEFVAL;
+	}
+	IMSG("%s %d\n", __func__, __LINE__);
 #endif
 
 	switch (trng->usr_cfg.mode) {
@@ -669,12 +769,44 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 			IMSG("0x%08" PRIx32, str[i]);
 		}
 	}
+#if defined(CFG_VERSAL_RNG_DRV_V2)
+	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
+	IMSG("%s %d\n", __func__, __LINE__);
+	/* DRNG Mode */
+	if (seed != NULL) {
+		/* Enable TST mode and set PRNG mode for reseed operation*/
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK, TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK);
 
+		/* Start reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
+		
+		/* For writing seed as an input to DF, PRNG start needs to be set */
+		IMSG("mul/DLen = %d", mul);
+		trng_write_seed(trng, seed, mul);
+	} 
+	else { /* HTRNG Mode */
+		// /* Enable ring oscillators for random seed source */
+		// XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_OSC_EN),
+		// 	TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
+		// IMSG("%s %d\n", __func__, __LINE__);
+		// /* Enable TRSSEN and set PRNG mode for reseed operation */
+		// XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
+		// 	TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TRSSEN_MASK |
+		// 	TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK);
+		// IMSG("%s %d\n", __func__, __LINE__);
+		// /* Start reseed operation */
+		// XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
+		// 	TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
+		// IMSG("%s %d\n", __func__, __LINE__);
+	}
+
+	trng->stats.elapsed_seed_life = 0;
+#else
 	trng_write32_range(trng, TRNG_EXT_SEED_0, TRNG_SEED_REGS, seed);
 	if (str)
 		trng_write32_range(trng, TRNG_PER_STRING_0, TRNG_PERS_STR_REGS,
 				   str);
-
+#endif
 	return TEE_SUCCESS;
 }
 
@@ -730,7 +862,8 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 		if (trng_reseed_internal_df(trng, eseed, str))
 			goto error;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
+#ifndef CFG_VERSAL_RNG_DRV_V2
 	trng_write32(trng->cfg.addr, TRNG_CTRL,
 		     PRNGMODE_RESEED | TRNG_CTRL_PRNGXS_MASK);
 
@@ -749,6 +882,8 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 		goto error;
 
 	trng_clrset32(trng->cfg.addr, TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, 0);
+#endif
+	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -830,6 +965,7 @@ static TEE_Result trng_instantiate(struct versal_trng *trng,
 	}
 
 	trng->status = TRNG_HEALTHY;
+	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -865,9 +1001,15 @@ static TEE_Result trng_reseed(struct versal_trng *trng, uint8_t *eseed,
 	if (eseed && !memcmp(eseed, trng->usr_cfg.init_seed, trng->len))
 		goto error;
 
+
+#if defined(CFG_VERSAL_RNG_DRV_V2)
+	IMSG("%s %d\n", __func__, __LINE__);
+	/* Wait for reseed operation and check CTF flag */
+	trng_wait_for_event(trng->cfg.addr, TRNG_STATUS, TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK, TRNG_RESEED_TIMEOUT);
+	IMSG("%s %d\n", __func__, __LINE__);
+#endif
 	if (trng_reseed_internal(trng, eseed, NULL, mul))
 		goto error;
-
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;

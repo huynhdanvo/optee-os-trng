@@ -966,6 +966,7 @@ static int XTrngpsx_ReseedInternal(XTrngpsx_Instance *InstancePtr, const u8 *See
 			TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
 		IMSG("%s %d\n", __func__, __LINE__);
 		/* For writing seed as an input to DF, PRNG start needs to be set */
+		IMSG("mul/DLen = %d", DLen);
 		XTRNGPSX_TEMPORAL_CHECK(END,Status, XTrngpsx_WriteSeed, InstancePtr, Seed,
 			DLen);
 		IMSG("%s %d\n", __func__, __LINE__);

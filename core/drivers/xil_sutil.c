@@ -866,6 +866,9 @@ s32 Xil_SecureRMW32(UINTPTR Addr, u32 Mask, u32 Value)
 	u32 ReadReg;
 	u32 Val;
 
+	IMSG("Mask = 0x%08" PRIx32, Mask);
+	IMSG("Value = 0x%08" PRIx32, Value);
+
 	Val = Xil_In32(Addr);
 	Val = (Val & (~Mask)) | (Mask & Value);
 	Xil_Out32(Addr, Val);
