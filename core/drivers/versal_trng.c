@@ -611,15 +611,21 @@ static TEE_Result trng_collect_random(struct versal_trng *trng, uint8_t *dst,
 }
 
 static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
-					    uint8_t *eseed, uint8_t *str)
+					    uint8_t *eseed, uint8_t *str, uint32_t mul)
 {
 	uint8_t entropy[TRNG_SEED_LEN] = { 0 };
 	uint8_t *seed = NULL;
-
+	/* Configure DF Len */
 #if defined(CFG_VERSAL_RNG_DRV_V2)
+	//XTrngpsx_CfgDfLen
 	if (trng->cfg.version == TRNG_V2)
-		trng_clrset32(trng->cfg.addr, TRNG_CTRL_3,
-			      TRNG_CTRL_3_DLEN_MASK, TRNG_CTRL_3_DLEN_DEFVAL);
+	{
+	IMSG("TRNG_CTRL_3_DLEN_MASK = 0x%08" PRIx32, TRNG_CTRL_3_DLEN_MASK);
+	IMSG("(mul << TRNG_CTRL_3_DLEN_SHIFT) = 0x%08" PRIx32, mul << TRNG_CTRL_3_DLEN_SHIFT);
+		// trng_clrset32(trng->cfg.addr, TRNG_CTRL_3,
+		// 	      TRNG_CTRL_3_DLEN_MASK, TRNG_CTRL_3_DLEN_DEFVAL);
+		trng_clrset32(trng->cfg.addr, TRNG_CTRL_3, TRNG_CTRL_3_DLEN_MASK, (mul << TRNG_CTRL_3_DLEN_SHIFT));
+	}
 #endif
 
 	switch (trng->usr_cfg.mode) {
@@ -643,6 +649,25 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 	default:
 		seed = NULL;
 		break;
+	}
+
+	//TODO
+	//Trying to dump seed and perstr
+	int i;
+	IMSG("seed");
+	for(i = 0; i < 128U; i++)
+	{
+		IMSG("0x%08" PRIx32, seed[i]);
+	}
+
+	if (str)
+	{
+		IMSG("str");
+		//Segmentation fault 2nd time
+		for(i = 0; i < 48U; i++)
+		{
+			IMSG("0x%08" PRIx32, str[i]);
+		}
 	}
 
 	trng_write32_range(trng, TRNG_EXT_SEED_0, TRNG_SEED_REGS, seed);
@@ -699,7 +724,7 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 		trng->len = (mul + 1) * BYTES_PER_BLOCK;
 
 	if (trng->usr_cfg.df_disable || trng->cfg.version == TRNG_V2) {
-		if (trng_reseed_internal_nodf(trng, eseed, str))
+		if (trng_reseed_internal_nodf(trng, eseed, str, mul))
 			goto error;
 	} else {
 		if (trng_reseed_internal_df(trng, eseed, str))
@@ -772,6 +797,7 @@ static TEE_Result trng_instantiate(struct versal_trng *trng,
 		goto error;
 
 	memcpy(&trng->usr_cfg, usr_cfg, sizeof(struct trng_usr_cfg));
+	/* Bring TRNG and PRNG unit core out of reset */
 	trng_reset(trng);
 
 	if (trng->usr_cfg.iseed_en)
@@ -791,10 +817,13 @@ static TEE_Result trng_instantiate(struct versal_trng *trng,
 			      TRNG_CTRL_2_RCTCUTOFF_MASK,
 			      TRNG_CTRL_2_RCTCUTOFF_DEFVAL
 			      << TRNG_CTRL_2_RCTCUTOFF_SHIFT);
+		/* Configure default DIT value */
 		trng_clrset32(trng->cfg.addr, TRNG_CTRL_2,
 			      TRNG_CTRL_2_DIT_MASK,
 			      TRNG_CTRL_2_DIT_DEFVAL << TRNG_CTRL_2_DIT_SHIFT);
 	}
+
+	/* Do reseed operation when mode is DRNG/HRNG */
 	if (trng->usr_cfg.mode != TRNG_PTRNG) {
 		if (trng_reseed_internal(trng, seed, pers, trng->usr_cfg.dfmul))
 			goto error;
@@ -1027,6 +1056,19 @@ static TEE_Result trng_kat_test(struct versal_trng *trng)
 	if (trng_generate(trng, out, sizeof(out), false))
 		goto error;
 
+	int i;
+	IMSG("out");
+	for(i = 0; i < TRNG_GEN_LEN; i++)
+	{
+		IMSG("0x%08" PRIx32, out[i]);
+	}
+
+	IMSG("expected_out");
+	for(i = 0; i < TRNG_GEN_LEN; i++)
+	{
+		IMSG("0x%08" PRIx32, expected_out[i]);
+	}
+
 	if (memcmp(out, expected_out, TRNG_GEN_LEN)) {
 		EMSG("K.A.T mismatch");
 		goto error;
@@ -1178,12 +1220,26 @@ static TEE_Result trng_kat_test_v2(struct versal_trng *trng)
 		goto error;
 
 	dump_trng_usr_cfg(tests);
+	DMSG("Base address v2 0x%" PRIx32, trng->cfg.addr);
 
 	if (trng_reseed(trng, reseed_entropy, 7))
 		goto error;
 
 	if (trng_generate(trng, out, sizeof(out), false))
 		goto error;
+
+	int i;
+	IMSG("out");
+	for(i = 0; i < TRNG_GEN_LEN; i++)
+	{
+		IMSG("0x%08" PRIx32, out[i]);
+	}
+
+	IMSG("expected_out");
+	for(i = 0; i < TRNG_GEN_LEN; i++)
+	{
+		IMSG("0x%08" PRIx32, expected_out[i]);
+	}
 
 	if (memcmp(out, expected_out, TRNG_GEN_LEN)) {
 		EMSG("K.A.T mismatch");

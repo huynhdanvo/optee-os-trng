@@ -53,6 +53,15 @@
 
 /************************************ Variable Definitions ***************************************/
 
+
+
+// Temporarl implementations
+
+
+
+
+
+
 /*************************************************************************************************/
 /**
  * @brief
@@ -141,6 +150,7 @@ int XTrngpsx_DRBGKat(XTrngpsx_Instance *InstancePtr) {
 	}
 	IMSG("%s %d\n", __func__, __LINE__);
 	Status = XTrngpsx_Reseed(InstancePtr, ReseedEntropy, XTRNGPSX_KAT_DEFAULT_DF_lENGTH);
+	IMSG("%s %d\n", __func__, __LINE__);
 	if (Status != XST_SUCCESS) {
 		goto END;
 	}
