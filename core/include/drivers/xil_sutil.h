@@ -41,6 +41,7 @@ extern "C" {
 #endif
 
 /******************************* Include Files ********************************/
+#include <stdio.h>
 #include <drivers/xil_types.h>
 #include <drivers/xil_io.h>
 #include <drivers/xstatus.h>
@@ -253,7 +254,7 @@ s32 Xil_SStrCat (u8 *DestStr, const u32 DestSize,
 u32 Xil_WaitForEventSet(u32 Timeout, u32 NumOfEvents, volatile u32 *EventAddr, ...);
 
 /**< Implements Read Modify Writes securely */
-// s32 Xil_SecureRMW32(UINTPTR Addr, u32 Mask, u32 Value);
+s32 Xil_SecureRMW32(UINTPTR Addr, u32 Mask, u32 Value);
 
 /**< Changes byte endianness of source buffer and copies it into destination */
 s32 Xil_SChangeEndiannessAndCpy(void *Dest, const u32 DestSize,

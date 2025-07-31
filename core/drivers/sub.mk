@@ -80,6 +80,7 @@ srcs-$(CFG_VERSAL_RNG_DRV) += xtrngpsx.c
 srcs-$(CFG_VERSAL_RNG_DRV) += xtrngpsx_tests.c
 srcs-$(CFG_VERSAL_RNG_DRV) += xtrngpsx_sinit.c
 srcs-$(CFG_VERSAL_RNG_DRV) += xtrngpsx_g.c
+srcs-$(CFG_VERSAL_RNG_DRV) += xil_sutil.c
 srcs-$(CFG_VERSAL_NVM) += versal_nvm.c
 srcs-$(CFG_VERSAL_NET_NVM) += versal_net_nvm.c
 srcs-$(CFG_VERSAL_SHA3_384) += versal_sha3_384.c

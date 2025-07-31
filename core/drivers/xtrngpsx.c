@@ -180,43 +180,43 @@ static inline u32 XTrngpsx_ReadReg(UINTPTR RegAddress)
 
 // Xil_SecureRMW32(addr, mask, val)
 
-static inline s32 Xil_SecureRMW32(vaddr_t addr, uint32_t mask, uint32_t value)
-{
-	int status = XST_FAILURE;
-	uint32_t reg = io_read32(addr);
-	uint32_t val;
-	val = (val & ~mask) | (value & mask);
-	io_write32(addr, val);
+// static inline s32 Xil_SecureRMW32(vaddr_t addr, uint32_t mask, uint32_t value)
+// {
+// 	int status = XST_FAILURE;
+// 	uint32_t reg = io_read32(addr);
+// 	uint32_t val;
+// 	val = (val & ~mask) | (value & mask);
+// 	io_write32(addr, val);
 
-	//Verify
-	reg = io_read32(addr) & mask;
-	if(reg == (mask & value)){
-		status = XST_SUCCESS;
-	} else {
-		IMSG("Reg value is not what was written !");
-	}
+// 	//Verify
+// 	reg = io_read32(addr) & mask;
+// 	if(reg == (mask & value)){
+// 		status = XST_SUCCESS;
+// 	} else {
+// 		IMSG("Reg value is not what was written !");
+// 	}
 
-	return status;
-}
+// 	return status;
+// }
 
-static inline int secure_rmw32(vaddr_t addr, uint32_t mask, uint32_t value)
-{
-	int status = XST_FAILURE;
-	uint32_t reg = io_read32(addr);
-	uint32_t val;
-	val = (val & ~mask) | (value & mask);
-	io_write32(addr, val);
+// static inline int secure_rmw32(vaddr_t addr, uint32_t mask, uint32_t value)
+// {
+// 	int status = XST_FAILURE;
+// 	uint32_t reg = io_read32(addr);
+// 	uint32_t val;
+// 	val = (val & ~mask) | (value & mask);
+// 	io_write32(addr, val);
 
-	//Verify
-	reg = io_read32(addr) & mask;
-	if(reg == (mask & value)){
-		status = XST_SUCCESS;
-	} else {
-		IMSG("Reg value is not what was written !");
-	}
+// 	//Verify
+// 	reg = io_read32(addr) & mask;
+// 	if(reg == (mask & value)){
+// 		status = XST_SUCCESS;
+// 	} else {
+// 		IMSG("Reg value is not what was written !");
+// 	}
 
-	return status;
-}
+// 	return status;
+// }
 
 
 /*************************************************************************************************/
@@ -664,52 +664,54 @@ END:
  **************************************************************************************************/
 int XTrngpsx_Reseed(XTrngpsx_Instance *InstancePtr, const u8 *Seed, u8 DLen) {
 	volatile int Status = XST_FAILURE;
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	if (InstancePtr == NULL) {
 		Status = XTRNGPSX_INVALID_PARAM;
 		goto END;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr->UserCfg.Mode == XTRNGPSX_DRNG_MODE) && (Seed == NULL)) {
 		Status = XTRNGPSX_INVALID_SEED_VALUE;
 		goto END;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	if ((Seed != NULL) && (InstancePtr->UserCfg.Mode == XTRNGPSX_HRNG_MODE)) {
 		Status = XTRNGPSX_INVALID_SEED_VALUE;
 		goto END;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	if ((DLen < XTRNGPSX_DF_MIN_LENGTH) || (DLen > XTRNGPSX_DF_MAX_LENGTH)) {
 		Status = XTRNGPSX_INVALID_DF_LENGTH;
 		goto END;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	if (InstancePtr->UserCfg.Mode == XTRNGPSX_PTRNG_MODE) {
 		Status = XTRNGPSX_INVALID_MODE;
 		goto END;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	if (InstancePtr->State == XTRNGPSX_UNINITIALIZED_STATE) {
 		Status = XTRNGPSX_INVALID_STATE;
 		goto END;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr->ErrorState != XTRNGPSX_HEALTHY) &&
 		(InstancePtr->ErrorState != XTRNGPSX_STARTUP_TEST)) {
 		Status = XTRNGPSX_UNHEALTHY_STATE;
 		goto END;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	/* Wait for reseed operation and check CTF flag */
 	if ((InstancePtr->State == XTRNGPSX_RESEED_STATE) && (InstancePtr->UserCfg.IsBlocking != TRUE)) {
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, XTrngpsx_WaitForReseed, InstancePtr);
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	XTRNGPSX_TEMPORAL_CHECK(END, Status, XTrngpsx_ReseedInternal, InstancePtr,
 		Seed, DLen, NULL, InstancePtr->UserCfg.IsBlocking);
+	IMSG("%s %d\n", __func__, __LINE__);
 
 END:
+	IMSG("%s %d\n", __func__, __LINE__);
 	return Status;
 }
 
@@ -939,10 +941,12 @@ static int XTrngpsx_ReseedInternal(XTrngpsx_Instance *InstancePtr, const u8 *See
 		IMSG("0x%08" PRIx32, Seed[i]);
 	}
 
-	IMSG("PerStr");
-	for(i = 0; i < 48U; i++)
-	{
-		IMSG("0x%08" PRIx32, PerStr[i]);
+	if (PerStr != NULL) {
+		IMSG("PerStr");
+		for(i = 0; i < 48U; i++)
+		{
+			IMSG("0x%08" PRIx32, PerStr[i]);
+		}
 	}
 
 	XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
@@ -1019,6 +1023,7 @@ static int XTrngpsx_WaitForReseed(XTrngpsx_Instance *InstancePtr) {
 	volatile int Status = XST_FAILURE;
 	volatile int StatusTmp = XST_FAILURE;
 
+	IMSG("%s %d\n", __func__, __LINE__);
 	XTRNGPSX_TEMPORAL_IMPL(Status, StatusTmp, wait_for_event,
 		   (UINTPTR)(InstancePtr->Config.BaseAddress + TRNG_STATUS),
 			TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK,
@@ -1027,16 +1032,20 @@ static int XTrngpsx_WaitForReseed(XTrngpsx_Instance *InstancePtr) {
 		Status = XTRNGPSX_TIMEOUT_ERROR;
 		goto END;
 	}
+	IMSG("%s %d\n", __func__, __LINE__);
 	if ((Xil_In32(InstancePtr->Config.BaseAddress + TRNG_STATUS) & TRNG_STATUS_CERTF_MASK) ==
 			TRNG_STATUS_CERTF_MASK) {
 		InstancePtr->ErrorState = XTRNGPSX_CATASTROPHIC;
 		Status = XTRNGPSX_CATASTROPHIC_CTF_ERROR;
 		goto END;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	Status = XTrngpsx_UtilRMW32((InstancePtr->Config.BaseAddress + TRNG_CTRL), TRNG_CTRL_PRNGSTART_MASK |
 			TRNG_CTRL_TRSSEN_MASK, 0U);
+	IMSG("%s %d\n", __func__, __LINE__);
+	
 END:
+	IMSG("%s %d\n", __func__, __LINE__);
 	return Status;
 }
 
