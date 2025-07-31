@@ -104,16 +104,17 @@
 #define TRNG_CTRL_4			0x14
 #endif
 
-#define TRNGPSX_PERS_STRING_LEN_IN_WORDS	12U	/**< Personalization string length in words */
-#define TRNGPSX_PERS_STRING_LEN_IN_BYTES	48U	/**< Personalization string length in bytes */
-#define TRNGPSX_WORD_LEN_IN_BYTES		4U	     /**< Word length in bytes */
-#define TRNGPSX_BYTE_LEN_IN_BITS		8U	     /**< Byte length in bits */
-#define TRNG_PER_STRNG_11    (0x000000ACU)
-#define TRNGPSX_DF_2CLKS_WAIT					2U     /** < delay after 1byte */
 #define TRNGPSX_DF_NUM_OF_BYTES_BEFORE_MIN_700CLKS_WAIT	8U /**< Number of bytes to be written before wait */
-#define TRNGPSX_BLOCK_LEN_IN_BYTES		16U	     /**< TRNG block length length in bytes */
-#define TRNGPSX_DF_700CLKS_WAIT				10U    /** < delay after 4bytes */
-
+#define TRNGPSX_PERS_STRING_LEN_IN_WORDS		12U	/**< Personalization string length in words */
+#define TRNGPSX_PERS_STRING_LEN_IN_BYTES		48U	/**< Personalization string length in bytes */
+#define TRNGPSX_WORD_LEN_IN_BYTES				4U	/**< Word length in bytes */
+#define TRNGPSX_BYTE_LEN_IN_BITS				8U	/**< Byte length in bits */
+#define TRNG_PER_STRNG_11    					(0x000000ACU)
+#define TRNGPSX_DF_2CLKS_WAIT					2U	/** < delay after 1byte */
+#define TRNGPSX_BLOCK_LEN_IN_BYTES				16U	/**< TRNG block length length in bytes */
+#define TRNGPSX_DF_700CLKS_WAIT					10U	/** < delay after 4bytes */
+#define TRNG_CTRL_PERSODISABLE_MASK   	 		0x00000400U
+#define TRNG_CTRL_PERSODISABLE_DEFVAL  			0x0U
 
 #define TRNG_EXT_SEED_0			0x40
 /*
@@ -181,16 +182,15 @@ static unsigned char sbx3[256];
 static unsigned char schedule[BLK_SIZE * (MAX_ROUNDS + 1)];
 static unsigned int rounds;
 
-static void dump_trng_usr_cfg(struct trng_usr_cfg conf){
-	IMSG("Mode = %d",conf.mode);
-	IMSG("SeedLife = %d",conf.seed_life);
-	IMSG("PredResistance = %d",conf.predict_en);
-	IMSG("personalization string = %d",conf.pstr_en);
-	IMSG("iseed_en = %d",conf.iseed_en);
-	IMSG("df_disable = %d",conf.df_disable);
-	IMSG("dfmul = %d",conf.dfmul);
-}
-
+// static void dump_trng_usr_cfg(struct trng_usr_cfg conf){
+// 	IMSG("Mode = %d",conf.mode);
+// 	IMSG("SeedLife = %d",conf.seed_life);
+// 	IMSG("PredResistance = %d",conf.predict_en);
+// 	IMSG("personalization string = %d",conf.pstr_en);
+// 	IMSG("iseed_en = %d",conf.iseed_en);
+// 	IMSG("df_disable = %d",conf.df_disable);
+// 	IMSG("dfmul = %d",conf.dfmul);
+// }
 
 static void rota4(uint8_t *a, uint8_t *b, uint8_t *c, uint8_t *d)
 {
@@ -707,16 +707,10 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 {
 	uint8_t entropy[TRNG_SEED_LEN] = { 0 };
 	uint8_t *seed = NULL;
-	/* Configure DF Len */
 #if defined(CFG_VERSAL_RNG_DRV_V2)
-#define TRNG_CTRL_PERSODISABLE_MASK    0x00000400U
-#define TRNG_CTRL_PERSODISABLE_DEFVAL  0x0U
+	/* Configure DF Len */
 	uint32_t PersMask = TRNG_CTRL_PERSODISABLE_MASK;
-	//XTrngpsx_CfgDfLen
-	if (trng->cfg.version == TRNG_V2)
-	{
-		IMSG("TRNG_CTRL_3_DLEN_MASK = 0x%08" PRIx32, TRNG_CTRL_3_DLEN_MASK);
-		IMSG("(mul << TRNG_CTRL_3_DLEN_SHIFT) = 0x%08" PRIx32, mul << TRNG_CTRL_3_DLEN_SHIFT);
+	if (trng->cfg.version == TRNG_V2){
 		trng_write32_v2(trng->cfg.addr + TRNG_CTRL_3, TRNG_CTRL_3_DLEN_MASK, (mul << TRNG_CTRL_3_DLEN_SHIFT));
 	}
 
@@ -725,7 +719,32 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		trng_write_perstr(trng, str);
 		PersMask = TRNG_CTRL_PERSODISABLE_DEFVAL;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
+
+	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
+
+	/* DRNG Mode */
+	if (seed != NULL) {
+		/* Enable TST mode and set PRNG mode for reseed operation*/
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK, TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK);
+
+		/* Start reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
+		
+		/* For writing seed as an input to DF, PRNG start needs to be set */
+		trng_write_seed(trng, seed, mul);
+	} 
+	else { /* HTRNG Mode */
+		/* Enable ring oscillators for random seed source */
+		trng_write32_v2(trng->cfg.addr + TRNG_OSC_EN, TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
+
+		/* Enable TRSSEN and set PRNG mode for reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TRSSEN_MASK | TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK);
+	
+		/* Start reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
+	}
+
+	trng->stats.elapsed_seed_life = 0;
 #endif
 
 	switch (trng->usr_cfg.mode) {
@@ -753,25 +772,24 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 
 	//TODO
 	//Trying to dump seed and perstr
-	int i;
-	IMSG("seed");
-	for(i = 0; i < 128U; i++)
-	{
-		IMSG("0x%08" PRIx32, seed[i]);
-	}
+	// int i;
+	// IMSG("seed");
+	// for(i = 0; i < 128U; i++)
+	// {
+	// 	IMSG("0x%08" PRIx32, seed[i]);
+	// }
 
-	if (str)
-	{
-		IMSG("str");
-		//Segmentation fault 2nd time
-		for(i = 0; i < 48U; i++)
-		{
-			IMSG("0x%08" PRIx32, str[i]);
-		}
-	}
+	// if (str)
+	// {
+	// 	IMSG("str");
+	// 	//Segmentation fault 2nd time
+	// 	for(i = 0; i < 48U; i++)
+	// 	{
+	// 		IMSG("0x%08" PRIx32, str[i]);
+	// 	}
+	// }
 #if defined(CFG_VERSAL_RNG_DRV_V2)
 	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
-	IMSG("%s %d\n", __func__, __LINE__);
 	/* DRNG Mode */
 	if (seed != NULL) {
 		/* Enable TST mode and set PRNG mode for reseed operation*/
@@ -781,23 +799,18 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
 		
 		/* For writing seed as an input to DF, PRNG start needs to be set */
-		IMSG("mul/DLen = %d", mul);
+		// IMSG("mul/DLen = %d", mul);
 		trng_write_seed(trng, seed, mul);
 	} 
 	else { /* HTRNG Mode */
-		// /* Enable ring oscillators for random seed source */
-		// XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_OSC_EN),
-		// 	TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
-		// IMSG("%s %d\n", __func__, __LINE__);
-		// /* Enable TRSSEN and set PRNG mode for reseed operation */
-		// XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
-		// 	TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TRSSEN_MASK |
-		// 	TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK);
-		// IMSG("%s %d\n", __func__, __LINE__);
-		// /* Start reseed operation */
-		// XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
-		// 	TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
-		// IMSG("%s %d\n", __func__, __LINE__);
+		/* Enable ring oscillators for random seed source */
+		trng_write32_v2(trng->cfg.addr + TRNG_OSC_EN, TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
+
+		/* Enable TRSSEN and set PRNG mode for reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TRSSEN_MASK | TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK);
+	
+		/* Start reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
 	}
 
 	trng->stats.elapsed_seed_life = 0;
@@ -862,7 +875,6 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 		if (trng_reseed_internal_df(trng, eseed, str))
 			goto error;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 #ifndef CFG_VERSAL_RNG_DRV_V2
 	trng_write32(trng->cfg.addr, TRNG_CTRL,
 		     PRNGMODE_RESEED | TRNG_CTRL_PRNGXS_MASK);
@@ -883,7 +895,6 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 
 	trng_clrset32(trng->cfg.addr, TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, 0);
 #endif
-	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -965,7 +976,6 @@ static TEE_Result trng_instantiate(struct versal_trng *trng,
 	}
 
 	trng->status = TRNG_HEALTHY;
-	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -1001,12 +1011,9 @@ static TEE_Result trng_reseed(struct versal_trng *trng, uint8_t *eseed,
 	if (eseed && !memcmp(eseed, trng->usr_cfg.init_seed, trng->len))
 		goto error;
 
-
 #if defined(CFG_VERSAL_RNG_DRV_V2)
-	IMSG("%s %d\n", __func__, __LINE__);
 	/* Wait for reseed operation and check CTF flag */
 	trng_wait_for_event(trng->cfg.addr, TRNG_STATUS, TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK, TRNG_RESEED_TIMEOUT);
-	IMSG("%s %d\n", __func__, __LINE__);
 #endif
 	if (trng_reseed_internal(trng, eseed, NULL, mul))
 		goto error;
@@ -1291,6 +1298,7 @@ END:
 
 static TEE_Result trng_kat_test_v2(struct versal_trng *trng)
 {
+	IMSG("%s %d\n", __func__, __LINE__);
 	struct trng_usr_cfg tests = {
 		.mode = TRNG_DRNG,
 		.seed_life = 2,
@@ -1361,7 +1369,7 @@ static TEE_Result trng_kat_test_v2(struct versal_trng *trng)
 	if (trng_instantiate(trng, &tests))
 		goto error;
 
-	dump_trng_usr_cfg(tests);
+	// dump_trng_usr_cfg(tests);
 	DMSG("Base address v2 0x%" PRIx32, trng->cfg.addr);
 
 	if (trng_reseed(trng, reseed_entropy, 7))
@@ -1370,27 +1378,27 @@ static TEE_Result trng_kat_test_v2(struct versal_trng *trng)
 	if (trng_generate(trng, out, sizeof(out), false))
 		goto error;
 
-	int i;
-	IMSG("out");
-	for(i = 0; i < TRNG_GEN_LEN; i++)
-	{
-		IMSG("0x%08" PRIx32, out[i]);
-	}
+	// int i;
+	// IMSG("out");
+	// for(i = 0; i < TRNG_GEN_LEN; i++)
+	// {
+	// 	IMSG("0x%08" PRIx32, out[i]);
+	// }
 
-	IMSG("expected_out");
-	for(i = 0; i < TRNG_GEN_LEN; i++)
-	{
-		IMSG("0x%08" PRIx32, expected_out[i]);
-	}
-
+	// IMSG("expected_out");
+	// for(i = 0; i < TRNG_GEN_LEN; i++)
+	// {
+	// 	IMSG("0x%08" PRIx32, expected_out[i]);
+	// }
+	IMSG("%s %d\n", __func__, __LINE__);
 	if (memcmp(out, expected_out, TRNG_GEN_LEN)) {
 		EMSG("K.A.T mismatch");
 		goto error;
 	}
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	if (trng_release(trng))
 		goto error;
-
+	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -1441,7 +1449,7 @@ TEE_Result versal_trng_hw_init(struct versal_trng *trng,
 		break;
 
 	case TRNG_V2:
-		trng_kat_test_v3(trng);
+		// trng_kat_test_v3(trng);
 		if (trng_kat_test_v2(trng)) {
 			EMSG("KAT Failed");
 			panic();
