@@ -160,6 +160,20 @@ int XTrngpsx_DRBGKat(XTrngpsx_Instance *InstancePtr) {
 		goto END;
 	}
 	IMSG("%s %d\n", __func__, __LINE__);
+
+	int i;
+	IMSG("RandBuf bare-metal");
+	for(i = 0; i < sizeof ExpectedOutput; i++)
+	{
+		IMSG("0x%08" PRIx32, RandBuf[i]);
+	}
+
+	IMSG("ExpectedOutput bare-metal");
+	for(i = 0; i < sizeof ExpectedOutput; i++)
+	{
+		IMSG("0x%08" PRIx32, ExpectedOutput[i]);
+	}
+
 	Status = memcmp(ExpectedOutput, RandBuf, sizeof(ExpectedOutput));
 	if (Status != 0) {
 		Status = XTRNGPSX_KAT_FAILED_ERROR;
