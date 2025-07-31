@@ -709,11 +709,8 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 #if defined(CFG_VERSAL_RNG_DRV_V2)
 	/* Configure DF Len */
 	uint32_t PersMask = TRNG_CTRL_PERSODISABLE_MASK;
-	//XTrngpsx_CfgDfLen
 	if (trng->cfg.version == TRNG_V2)
 	{
-		IMSG("TRNG_CTRL_3_DLEN_MASK = 0x%08" PRIx32, TRNG_CTRL_3_DLEN_MASK);
-		IMSG("(mul << TRNG_CTRL_3_DLEN_SHIFT) = 0x%08" PRIx32, mul << TRNG_CTRL_3_DLEN_SHIFT);
 		trng_write32_v2(trng->cfg.addr + TRNG_CTRL_3, TRNG_CTRL_3_DLEN_MASK, (mul << TRNG_CTRL_3_DLEN_SHIFT));
 	}
 
@@ -722,7 +719,6 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		trng_write_perstr(trng, str);
 		PersMask = TRNG_CTRL_PERSODISABLE_DEFVAL;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 #endif
 
 	switch (trng->usr_cfg.mode) {
@@ -748,7 +744,6 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		break;
 	}
 
-	//TODO
 	//Trying to dump seed and perstr
 	// int i;
 	// IMSG("seed");
