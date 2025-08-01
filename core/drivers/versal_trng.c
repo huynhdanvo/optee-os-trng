@@ -706,9 +706,7 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		persmask = TRNG_CTRL_PERSODISABLE_DEFVAL;
 	}
 
-	trng_write32_v2(trng->cfg.addr + TRNG_CTRL,
-		TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK,
-		persmask);
+	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, persmask);
 	/* DRNG Mode */
 	if (eseed != NULL) {
 		/* Enable TST mode and set PRNG mode for reseed operation*/
