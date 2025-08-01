@@ -719,7 +719,36 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		trng_write_perstr(trng, str);
 		PersMask = TRNG_CTRL_PERSODISABLE_DEFVAL;
 	}
-#endif
+
+	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
+	IMSG("%s %d\n", __func__, __LINE__);
+	/* DRNG Mode */
+	if (eseed != NULL) {
+		/* Enable TST mode and set PRNG mode for reseed operation*/
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK, TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK);
+
+		/* Start reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
+		
+		/* For writing seed as an input to DF, PRNG start needs to be set */
+		trng_write_seed(trng, eseed, mul);
+	} 
+	else { /* HTRNG Mode */
+		/* Enable ring oscillators for random seed source */
+		trng_write32_v2(trng->cfg.addr + TRNG_OSC_EN, TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
+
+		/* Enable TRSSEN and set PRNG mode for reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TRSSEN_MASK | TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK);
+	
+		/* Start reseed operation */
+		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
+	}
+	// if (trng_wait_for_event(trng->cfg.addr, TRNG_STATUS,
+	// 	TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK,
+	// 	TRNG_RESEED_TIMEOUT))
+	// 	goto error;
+	trng->stats.elapsed_seed_life = 0;
+#else
 
 	switch (trng->usr_cfg.mode) {
 	case TRNG_HRNG:
@@ -744,51 +773,6 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		break;
 	}
 
-	//Trying to dump seed and perstr
-	// int i;
-	// IMSG("seed");
-	// for(i = 0; i < 128U; i++)
-	// {
-	// 	IMSG("0x%08" PRIx32, seed[i]);
-	// }
-
-	// if (str)
-	// {
-	// 	IMSG("str");
-	// 	//Segmentation fault 2nd time
-	// 	for(i = 0; i < 48U; i++)
-	// 	{
-	// 		IMSG("0x%08" PRIx32, str[i]);
-	// 	}
-	// }
-#if defined(CFG_VERSAL_RNG_DRV_V2)
-	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
-	IMSG("%s %d\n", __func__, __LINE__);
-	/* DRNG Mode */
-	if (seed != NULL) {
-		/* Enable TST mode and set PRNG mode for reseed operation*/
-		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK, TRNG_CTRL_TSTMODE_MASK | TRNG_CTRL_TRSSEN_MASK);
-
-		/* Start reseed operation */
-		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
-		
-		/* For writing seed as an input to DF, PRNG start needs to be set */
-		// IMSG("mul/DLen = %d", mul);
-		trng_write_seed(trng, seed, mul);
-	} 
-	else { /* HTRNG Mode */
-		/* Enable ring oscillators for random seed source */
-		trng_write32_v2(trng->cfg.addr + TRNG_OSC_EN, TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
-
-		/* Enable TRSSEN and set PRNG mode for reseed operation */
-		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TRSSEN_MASK | TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK);
-	
-		/* Start reseed operation */
-		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
-	}
-
-	trng->stats.elapsed_seed_life = 0;
-#else
 	trng_write32_range(trng, TRNG_EXT_SEED_0, TRNG_SEED_REGS, seed);
 	if (str)
 		trng_write32_range(trng, TRNG_PER_STRING_0, TRNG_PERS_STR_REGS,
