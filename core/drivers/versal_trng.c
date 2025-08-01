@@ -102,7 +102,6 @@
 #define TRNG_CTRL_3_DLEN_MASK		GENMASK_32(7, 0)
 #define TRNG_CTRL_3_DLEN_DEFVAL		0x9
 #define TRNG_CTRL_4			0x14
-#endif
 #define TRNGPSX_DF_NUM_OF_BYTES_BEFORE_MIN_700CLKS_WAIT	8U /**< Number of bytes to be written before wait */
 #define TRNGPSX_PERS_STRING_LEN_IN_WORDS		12U	/**< Personalization string length in words */
 #define TRNGPSX_PERS_STRING_LEN_IN_BYTES		48U	/**< Personalization string length in bytes */
@@ -114,6 +113,7 @@
 #define TRNGPSX_DF_700CLKS_WAIT					10U	/** < delay after 4bytes */
 #define TRNG_CTRL_PERSODISABLE_MASK   	 		0x00000400U
 #define TRNG_CTRL_PERSODISABLE_DEFVAL  			0x0U
+#endif
 
 #define TRNG_EXT_SEED_0			0x40
 /*
@@ -180,16 +180,6 @@ static unsigned char sbx2[256];
 static unsigned char sbx3[256];
 static unsigned char schedule[BLK_SIZE * (MAX_ROUNDS + 1)];
 static unsigned int rounds;
-
-// static void dump_trng_usr_cfg(struct trng_usr_cfg conf){
-// 	IMSG("Mode = %d",conf.mode);
-// 	IMSG("SeedLife = %d",conf.seed_life);
-// 	IMSG("PredResistance = %d",conf.predict_en);
-// 	IMSG("personalization string = %d",conf.pstr_en);
-// 	IMSG("iseed_en = %d",conf.iseed_en);
-// 	IMSG("df_disable = %d",conf.df_disable);
-// 	IMSG("dfmul = %d",conf.dfmul);
-// }
 
 static void rota4(uint8_t *a, uint8_t *b, uint8_t *c, uint8_t *d)
 {
@@ -463,6 +453,7 @@ static void trng_write32(vaddr_t addr, size_t off, uint32_t val)
 	io_write32(addr + off, val);
 }
 
+#if defined(CFG_VERSAL_RNG_DRV_V2)
 static int trng_write32_v2(vaddr_t addr, uint32_t mask, uint32_t value)
 {
 	int status = 1;
@@ -482,12 +473,6 @@ static int trng_write32_v2(vaddr_t addr, uint32_t mask, uint32_t value)
 
 	return status;
 }
-
-static void trng_clrset32(vaddr_t addr, size_t off, uint32_t mask, uint32_t val)
-{
-	io_clrsetbits32(addr + off, mask, mask & val);
-}
-
 
 static int trng_write_perstr(const struct versal_trng *trng, const uint8_t *perstr)
 {
@@ -544,6 +529,12 @@ static int trng_write_seed(const struct versal_trng *trng, const uint8_t *seed, 
 
 END:
 	return status;
+}
+#endif
+
+static void trng_clrset32(vaddr_t addr, size_t off, uint32_t mask, uint32_t val)
+{
+	io_clrsetbits32(addr + off, mask, mask & val);
 }
 
 static void trng_write32_range(const struct versal_trng *trng, uint32_t start,
@@ -703,7 +694,7 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 {
 #if defined(CFG_VERSAL_RNG_DRV_V2)
 	/* Configure DF Len */
-	uint32_t PersMask = TRNG_CTRL_PERSODISABLE_MASK;
+	uint32_t persmask = TRNG_CTRL_PERSODISABLE_MASK;
 	if (trng->cfg.version == TRNG_V2)
 	{
 		trng_write32_v2(trng->cfg.addr + TRNG_CTRL_3, TRNG_CTRL_3_DLEN_MASK, (mul << TRNG_CTRL_3_DLEN_SHIFT));
@@ -712,10 +703,10 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 	if (str != NULL)
 	{
 		trng_write_perstr(trng, str);
-		PersMask = TRNG_CTRL_PERSODISABLE_DEFVAL;
+		persmask = TRNG_CTRL_PERSODISABLE_DEFVAL;
 	}
 
-	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
+	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, persmask);
 	/* DRNG Mode */
 	if (eseed != NULL) {
 		/* Enable TST mode and set PRNG mode for reseed operation*/
