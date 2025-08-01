@@ -465,25 +465,22 @@ static void trng_write32(vaddr_t addr, size_t off, uint32_t val)
 
 static int trng_write32_v2(vaddr_t addr, uint32_t mask, uint32_t value)
 {
-	int Status = 1;
-	uint32_t ReadReg;
-	u32 Val;
+	int status = 1;
+	uint32_t regval;
+	u32 val;
 
-	IMSG("mask = 0x%08" PRIx32, mask);
-	IMSG("val = 0x%08" PRIx32, value);
-
-	Val = io_read32(addr);
-	Val = (Val & (~mask)) | (mask & value);
-	io_write32(addr, Val);
+	val = io_read32(addr);
+	val = (val & (~mask)) | (mask & value);
+	io_write32(addr, val);
 
 	/* verify value written to specified address */
-	ReadReg = io_read32(addr) & mask;
+	regval = io_read32(addr) & mask;
 
-	if (ReadReg == (mask & value)) {
-		Status = 0;
+	if (regval == (mask & value)) {
+		status = 0;
 	}
 
-	return Status;
+	return status;
 }
 
 static void trng_clrset32(vaddr_t addr, size_t off, uint32_t mask, uint32_t val)
@@ -704,8 +701,6 @@ static TEE_Result trng_collect_random(struct versal_trng *trng, uint8_t *dst,
 static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 					    uint8_t *eseed, uint8_t *str, uint32_t mul)
 {
-	uint8_t entropy[TRNG_SEED_LEN] = { 0 };
-	uint8_t *seed = NULL;
 #if defined(CFG_VERSAL_RNG_DRV_V2)
 	/* Configure DF Len */
 	uint32_t PersMask = TRNG_CTRL_PERSODISABLE_MASK;
@@ -721,7 +716,6 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 	}
 
 	trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
-	IMSG("%s %d\n", __func__, __LINE__);
 	/* DRNG Mode */
 	if (eseed != NULL) {
 		/* Enable TST mode and set PRNG mode for reseed operation*/
@@ -743,13 +737,10 @@ static TEE_Result trng_reseed_internal_nodf(struct versal_trng *trng,
 		/* Start reseed operation */
 		trng_write32_v2(trng->cfg.addr + TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
 	}
-	// if (trng_wait_for_event(trng->cfg.addr, TRNG_STATUS,
-	// 	TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK,
-	// 	TRNG_RESEED_TIMEOUT))
-	// 	goto error;
 	trng->stats.elapsed_seed_life = 0;
 #else
-
+	uint8_t entropy[TRNG_SEED_LEN] = { 0 };
+	uint8_t *seed = NULL;
 	switch (trng->usr_cfg.mode) {
 	case TRNG_HRNG:
 		trng_write32(trng->cfg.addr, TRNG_OSC_EN, TRNG_OSC_EN_VAL_MASK);
@@ -833,7 +824,6 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 		if (trng_reseed_internal_df(trng, eseed, str))
 			goto error;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 #ifndef CFG_VERSAL_RNG_DRV_V2
 	trng_write32(trng->cfg.addr, TRNG_CTRL,
 		     PRNGMODE_RESEED | TRNG_CTRL_PRNGXS_MASK);
@@ -841,7 +831,8 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 	/* Start the reseed operation */
 	trng_clrset32(trng->cfg.addr, TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK,
 		      TRNG_CTRL_PRNGSTART_MASK);
-
+#endif
+	/* Wait for reseed operation */
 	if (trng_wait_for_event(trng->cfg.addr, TRNG_STATUS,
 				TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK,
 				TRNG_RESEED_TIMEOUT))
@@ -853,8 +844,6 @@ static TEE_Result trng_reseed_internal(struct versal_trng *trng,
 		goto error;
 
 	trng_clrset32(trng->cfg.addr, TRNG_CTRL, TRNG_CTRL_PRNGSTART_MASK, 0);
-#endif
-	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -936,7 +925,6 @@ static TEE_Result trng_instantiate(struct versal_trng *trng,
 	}
 
 	trng->status = TRNG_HEALTHY;
-	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
@@ -974,10 +962,8 @@ static TEE_Result trng_reseed(struct versal_trng *trng, uint8_t *eseed,
 
 
 #if defined(CFG_VERSAL_RNG_DRV_V2)
-	IMSG("%s %d\n", __func__, __LINE__);
-	/* Wait for reseed operation and check CTF flag */
+	/* Wait for reseed operation */
 	trng_wait_for_event(trng->cfg.addr, TRNG_STATUS, TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK, TRNG_RESEED_TIMEOUT);
-	IMSG("%s %d\n", __func__, __LINE__);
 #endif
 	if (trng_reseed_internal(trng, eseed, NULL, mul))
 		goto error;
@@ -1169,19 +1155,6 @@ static TEE_Result trng_kat_test(struct versal_trng *trng)
 	if (trng_generate(trng, out, sizeof(out), false))
 		goto error;
 
-	int i;
-	IMSG("out");
-	for(i = 0; i < TRNG_GEN_LEN; i++)
-	{
-		IMSG("0x%08" PRIx32, out[i]);
-	}
-
-	IMSG("expected_out");
-	for(i = 0; i < TRNG_GEN_LEN; i++)
-	{
-		IMSG("0x%08" PRIx32, expected_out[i]);
-	}
-
 	if (memcmp(out, expected_out, TRNG_GEN_LEN)) {
 		EMSG("K.A.T mismatch");
 		goto error;
@@ -1196,9 +1169,9 @@ error:
 	return TEE_ERROR_GENERIC;
 }
 
+__maybe_unused
 static TEE_Result trng_kat_test_v3(struct versal_trng *trng)
 {
-	IMSG("trng_kat_test_v3");
 #define XTRNGPSX_EXAMPLE_SEEDLIFE			12U
 #define XTRNGPSX_EXAMPLE_DFLENMUL			4U
 #define XTRNGPSX_EXAMPLE_RESEED_DFLENMUL	3U
@@ -1211,44 +1184,31 @@ static TEE_Result trng_kat_test_v3(struct versal_trng *trng)
 #endif
 
 	XTrngpsx_Instance Trngpsx; /* Instance of TRNGPSX */
-	u8 RandBuf[XTRNGPSX_SEC_STRENGTH_IN_BYTES];
-
-
 	int Status = XST_SUCCESS;
 	XTrngpsx_Config *Config;
-	XTrngpsx_UserConfig UsrCfg = {
-			.Mode = XTRNGPSX_DRNG_MODE,
-			.SeedLife = XTRNGPSX_EXAMPLE_SEEDLIFE,
-			.DFLength = XTRNGPSX_EXAMPLE_DFLENMUL,
-			.IsBlocking = FALSE,
-	};
 
-	IMSG("%s %d\n", __func__, __LINE__);
+	IMSG("trng_kat_test_v3");
+
 	/*
 	 * Initialize the TRNGPSX driver so that it's ready to use look up
 	 * configuration in the config table, then initialize it.
 	 */
 
-	IMSG("XTRNGPSX_PMC_DEVICE = 0x%08" PRIx32, XTRNGPSX_PMC_DEVICE);
 	Config = XTrngpsx_LookupConfig(XTRNGPSX_PMC_DEVICE);
 	if (NULL == Config) {
 		IMSG("LookupConfig Failed \n\r");
 		goto END;
 	}
 
-	IMSG("Config->BaseAddress = 0x%08" PRIx32, Config->BaseAddress);
 	//Force BaseAddress
 	Config->BaseAddress = trng->cfg.addr;
-	IMSG("Config->BaseAddress = 0x%08" PRIx32, Config->BaseAddress);
 
- 	IMSG("%s %d\n", __func__, __LINE__);
 	/* Initialize the TRNGPSX driver so that it is ready to use. */
 	Status = XTrngpsx_CfgInitialize(&Trngpsx, Config, Config->BaseAddress);
 	if (Status != XST_SUCCESS) {
 		IMSG("CfgInitialize Failed, Status: 0x%08x\n\r", Status);
 		goto END;
 	}
- 	IMSG("%s %d\n", __func__, __LINE__);
 	Status = XTrngpsx_PreOperationalSelfTests(&Trngpsx);
 	if (Status != XST_SUCCESS) {
 		IMSG("KAT Failed, Status: 0x%08x\n\r", Status);
@@ -1262,7 +1222,6 @@ END:
 
 static TEE_Result trng_kat_test_v2(struct versal_trng *trng)
 {
-	IMSG("%s %d\n", __func__, __LINE__);
 	struct trng_usr_cfg tests = {
 		.mode = TRNG_DRNG,
 		.seed_life = 2,
@@ -1334,7 +1293,6 @@ static TEE_Result trng_kat_test_v2(struct versal_trng *trng)
 		goto error;
 
 	// dump_trng_usr_cfg(tests);
-	DMSG("Base address v2 0x%" PRIx32, trng->cfg.addr);
 
 	if (trng_reseed(trng, reseed_entropy, 7))
 		goto error;
@@ -1354,15 +1312,12 @@ static TEE_Result trng_kat_test_v2(struct versal_trng *trng)
 	// {
 	// 	IMSG("0x%08" PRIx32, expected_out[i]);
 	// }
-	IMSG("%s %d\n", __func__, __LINE__);
 	if (memcmp(out, expected_out, TRNG_GEN_LEN)) {
 		EMSG("K.A.T mismatch");
 		goto error;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if (trng_release(trng))
 		goto error;
-	IMSG("%s %d\n", __func__, __LINE__);
 	return TEE_SUCCESS;
 error:
 	trng->status = TRNG_ERROR;
