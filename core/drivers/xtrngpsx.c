@@ -934,20 +934,20 @@ static int XTrngpsx_ReseedInternal(XTrngpsx_Instance *InstancePtr, const u8 *See
 	IMSG("%s %d\n", __func__, __LINE__);
 
 	//Trying to dump seed and perstr
-	int i;
-	IMSG("Seed");
-	for(i = 0; i < 128U; i++)
-	{
-		IMSG("0x%08" PRIx32, Seed[i]);
-	}
+	// int i;
+	// IMSG("Seed");
+	// for(i = 0; i < 128U; i++)
+	// {
+	// 	IMSG("0x%08" PRIx32, Seed[i]);
+	// }
 
-	if (PerStr != NULL) {
-		IMSG("PerStr");
-		for(i = 0; i < 48U; i++)
-		{
-			IMSG("0x%08" PRIx32, PerStr[i]);
-		}
-	}
+	// if (PerStr != NULL) {
+	// 	IMSG("PerStr");
+	// 	for(i = 0; i < 48U; i++)
+	// 	{
+	// 		IMSG("0x%08" PRIx32, PerStr[i]);
+	// 	}
+	// }
 
 	XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
 		TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
