@@ -1214,7 +1214,7 @@ static void Trngpsx_PrintBytes(u8 *Src, u32 Size)
 }
 
 __maybe_unused
-static TEE_Result trng_kat_test_v3(struct versal_trng *trng)
+static TEE_Result trng_drng_test(struct versal_trng *trng)
 {
 #define XTRNGPSX_EXAMPLE_SEEDLIFE			12U
 #define XTRNGPSX_EXAMPLE_DFLENMUL			4U
@@ -1231,7 +1231,7 @@ static TEE_Result trng_kat_test_v3(struct versal_trng *trng)
 	int Status = XST_SUCCESS;
 	XTrngpsx_Config *Config;
 
-	IMSG("trng_kat_test_v3");
+	IMSG("xtrngpsx_drng_example.c test");
 
 	/*
 	 * Initialize the TRNGPSX driver so that it's ready to use look up
@@ -1265,7 +1265,100 @@ END:
 }
 
 __maybe_unused
-static TEE_Result trng_kat_test_v4(struct versal_trng *trng)
+static TEE_Result trng_ptrng_test(struct versal_trng *trng)
+{
+#define XTRNGPSX_EXAMPLE_SEEDLIFE			12U
+#define XTRNGPSX_EXAMPLE_DFLENMUL			4U
+#define XTRNGPSX_EXAMPLE_RESEED_DFLENMUL	3U
+#define XTRNGPSX_ENTROPY_SIZE               80U
+#define XTRNGPSX_RESEED_ENTROPY_SIZE        64U
+#ifndef SDT
+#define XTRNGPSX_PMC_DEVICE		0U /**< Device Id for PMC*/
+#else
+#define XTRNGPSX_PMC_DEVICE		XPAR_XTRNGPSX_0_BASEADDR /**< Device Id for PMC*/
+#endif
+	// xtrngpsx_ptrng_example.c
+	XTrngpsx_Instance Trngpsx; /* Instance of TRNGPSX */
+	int Status = XST_SUCCESS;
+	XTrngpsx_Config *Config;
+	uint8_t RandBuf[XTRNGPSX_SEC_STRENGTH_IN_BYTES];
+
+	XTrngpsx_UserConfig UsrCfg = {
+		.Mode = XTRNGPSX_PTRNG_MODE,
+		.SeedLife = XTRNGPSX_USER_CFG_SEED_LIFE,
+		.DFLength = XTRNGPSX_USER_CFG_DF_LENGTH,
+		.AdaptPropTestCutoff = XTRNGPSX_USER_CFG_ADAPT_TEST_CUTOFF,
+		.RepCountTestCutoff = XTRNGPSX_USER_CFG_REP_TEST_CUTOFF,
+	};
+
+	IMSG("xtrngpsx_ptrng_example.c");
+
+	/*
+	 * Initialize the TRNGPSX driver so that it's ready to use look up
+	 * configuration in the config table, then initialize it.
+	 */
+
+	Config = XTrngpsx_LookupConfig(XTRNGPSX_PMC_DEVICE);
+	if (NULL == Config) {
+		IMSG("LookupConfig Failed \n\r");
+		goto END;
+	}
+
+	//Force BaseAddress
+	Config->BaseAddress = trng->cfg.addr;
+
+	/* Initialize the TRNGPSX driver so that it is ready to use. */
+	Status = XTrngpsx_CfgInitialize(&Trngpsx, Config, Config->BaseAddress);
+	if (Status != XST_SUCCESS) {
+		IMSG("CfgInitialize Failed, Status: 0x%08x\n\r", Status);
+		goto END;
+	}
+	Status = XTrngpsx_PreOperationalSelfTests(&Trngpsx);
+	if (Status != XST_SUCCESS) {
+		IMSG("KAT Failed, Status: 0x%08x\n\r", Status);
+		goto END;
+	}
+
+	/* Instantiate to complete initialization */
+	Status = XTrngpsx_Instantiate(&Trngpsx, NULL, 0U, NULL, &UsrCfg);
+	if (Status != XST_SUCCESS) {
+		IMSG("Instantiate failed, Status: 0x%08x\n\r", Status);
+		goto END;
+	}
+
+	/* Invoke Generate twice and print, RandBuf contains random data from last call */
+	Status = XTrngpsx_Generate(&Trngpsx, RandBuf, sizeof(RandBuf), FALSE);
+	if (Status != XST_SUCCESS) {
+		IMSG("Generate Failed, Status: 0x%08x\n\r", Status);
+		goto END;
+	}
+
+	IMSG("Generate 1 Random data:\n\r");
+	Trngpsx_PrintBytes(RandBuf, sizeof(RandBuf));
+
+	Status = XTrngpsx_Generate(&Trngpsx, RandBuf, sizeof(RandBuf), FALSE);
+	if (Status != XST_SUCCESS) {
+		IMSG("Generate Failed, Status: 0x%08x\n\r", Status);
+		goto END;
+	}
+
+	IMSG("Generate 2 Random data:\n\r");
+	Trngpsx_PrintBytes(RandBuf, sizeof(RandBuf));
+
+	Status = XTrngpsx_Uninstantiate(&Trngpsx);
+	if (Status != XST_SUCCESS) {
+		IMSG("Uninstantiate Failed \n\r");
+		goto END;
+	}
+
+	Status = XST_SUCCESS;
+END:
+	return Status;
+}
+
+
+__maybe_unused
+static TEE_Result trng_hrng_test(struct versal_trng *trng)
 {
 #define XTRNGPSX_EXAMPLE_SEEDLIFE			12U
 #define XTRNGPSX_EXAMPLE_DFLENMUL			4U
@@ -1300,7 +1393,7 @@ static TEE_Result trng_kat_test_v4(struct versal_trng *trng)
 		.IsBlocking = FALSE,
 	};
 
-	IMSG("trng_kat_test_v4");
+	IMSG("xtrngpsx_hrng_example.c test");
 
 	/*
 	 * Initialize the TRNGPSX driver so that it's ready to use look up
@@ -1508,7 +1601,9 @@ TEE_Result versal_trng_hw_init(struct versal_trng *trng,
 		break;
 
 	case TRNG_V2:
-		// trng_kat_test_v4(trng);
+		// trng_hrng_test(trng);
+		// trng_drng_test(trng);
+		// trng_ptrng_test(trng);
 		if (trng_kat_test_v2(trng)) {
 			EMSG("KAT Failed");
 			panic();
