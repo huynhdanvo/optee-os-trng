@@ -517,104 +517,81 @@ END:
 int XTrngpsx_Instantiate(XTrngpsx_Instance *InstancePtr, const u8 *Seed, u32 SeedLength, const u8 *PersStr,
 			const XTrngpsx_UserConfig *UserCfg) {
 	volatile int Status = XST_FAILURE;
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg == NULL) || (InstancePtr == NULL)) {
 		Status = XTRNGPSX_INVALID_PARAM;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((Seed == NULL) && (UserCfg->Mode == XTRNGPSX_DRNG_MODE)) {
 		Status = XTRNGPSX_INVALID_SEED_VALUE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((Seed != NULL) && (UserCfg->Mode == XTRNGPSX_HRNG_MODE)) {
 		Status = XTRNGPSX_INVALID_SEED_VALUE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if (InstancePtr->State != XTRNGPSX_UNINITIALIZED_STATE) {
 		Status = XTRNGPSX_INVALID_STATE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg->Mode != XTRNGPSX_DRNG_MODE) && (UserCfg->Mode != XTRNGPSX_PTRNG_MODE) &&
 		(UserCfg->Mode != XTRNGPSX_HRNG_MODE)) {
 		Status = XTRNGPSX_INVALID_MODE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg->DFLength  < XTRNGPSX_DF_MIN_LENGTH) ||
 		(UserCfg->DFLength > XTRNGPSX_DF_MAX_LENGTH)) {
 		Status = XTRNGPSX_INVALID_DF_LENGTH;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg->Mode == XTRNGPSX_DRNG_MODE) &&
 		(SeedLength != ((UserCfg->DFLength + 1U) * XTRNGPSX_BLOCK_LEN_IN_BYTES))) {
 		Status = XTRNGPSX_INVALID_SEED_LENGTH;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg->SeedLife < XTRNGPSX_MIN_SEEDLIFE) ||
 		(UserCfg->SeedLife > XTRNGPSX_MAX_SEEDLIFE)) {
 		Status = XTRNGPSX_INVALID_SEED_LIFE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg->Mode != XTRNGPSX_DRNG_MODE) && ((UserCfg->AdaptPropTestCutoff < 1U) ||
 		(UserCfg->AdaptPropTestCutoff > XTRNGPSX_ADAPTPROPTESTCUTOFF_MAX_VAL))) {
 		Status = XTRNGPSX_INVALID_ADAPTPROPTEST_CUTOFF_VALUE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg->Mode != XTRNGPSX_DRNG_MODE) && ((UserCfg->RepCountTestCutoff < 1U) ||
 		(UserCfg->RepCountTestCutoff > XTRNGPSX_REPCOUNTTESTCUTOFF_MAX_VAL))) {
 		Status = XTRNGPSX_INVALID_REPCOUNTTEST_CUTOFF_VALUE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg->Mode != XTRNGPSX_PTRNG_MODE) &&
 		(UserCfg->IsBlocking != TRUE) && (UserCfg->IsBlocking != FALSE)) {
 		Status = XTRNGPSX_INVALID_BLOCKING_MODE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	memcpy(&InstancePtr->UserCfg, UserCfg, sizeof(XTrngpsx_UserConfig));
-	// if (Status != XST_SUCCESS) {
-	// 	Status = XTRNGPSX_USER_CFG_COPY_ERROR;
-	// 	goto END;
-	// }
-	IMSG("%s %d\n", __func__, __LINE__);
 	/* Bring TRNG and PRNG unit core out of reset */
 	Status = XTrngpsx_Set(InstancePtr);
 	if (Status != XST_SUCCESS) {
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((UserCfg->Mode == XTRNGPSX_PTRNG_MODE) ||
 		(UserCfg->Mode == XTRNGPSX_HRNG_MODE)) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		/* Configure cutoff values */
 		Status = XTrngpsx_CfgAdaptPropTestCutoff(InstancePtr, UserCfg->AdaptPropTestCutoff);
 		if (Status != XST_SUCCESS) {
 			goto END;
 		}
-		IMSG("%s %d\n", __func__, __LINE__);
 		Status = XTrngpsx_CfgRepCountTestCutoff(InstancePtr, UserCfg->RepCountTestCutoff);
 		if (Status != XST_SUCCESS) {
 			goto END;
 		}
-		IMSG("%s %d\n", __func__, __LINE__);
 		/* Configure default DIT value */
 		Status = XTrngpsx_CfgDIT(InstancePtr, TRNG_CTRL_2_DIT_DEFVAL);
 		if (Status != XST_SUCCESS) {
 			goto END;
 		}
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	InstancePtr->State = XTRNGPSX_INSTANTIATE_STATE;
-	IMSG("%s %d\n", __func__, __LINE__);
 	/* Do reseed operation when mode is DRNG/HRNG */
 	if ((UserCfg->Mode == XTRNGPSX_DRNG_MODE) ||
 		(UserCfg->Mode == XTRNGPSX_HRNG_MODE)) {
@@ -623,10 +600,8 @@ int XTrngpsx_Instantiate(XTrngpsx_Instance *InstancePtr, const u8 *Seed, u32 See
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, XTrngpsx_ReseedInternal, InstancePtr,
 								Seed, InstancePtr->UserCfg.DFLength, PersStr, UserCfg->IsBlocking);
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	Status = XST_SUCCESS;
 	InstancePtr->ErrorState = XTRNGPSX_HEALTHY;
-	IMSG("%s %d\n", __func__, __LINE__);
 END:
 	if (InstancePtr != NULL) {
 		if ((Status != XST_SUCCESS) &&
@@ -634,7 +609,6 @@ END:
 			InstancePtr->ErrorState = XTRNGPSX_ERROR;
 		}
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	return Status;
 }
 
@@ -664,54 +638,43 @@ END:
  **************************************************************************************************/
 int XTrngpsx_Reseed(XTrngpsx_Instance *InstancePtr, const u8 *Seed, u8 DLen) {
 	volatile int Status = XST_FAILURE;
-	IMSG("%s %d\n", __func__, __LINE__);
 	if (InstancePtr == NULL) {
 		Status = XTRNGPSX_INVALID_PARAM;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr->UserCfg.Mode == XTRNGPSX_DRNG_MODE) && (Seed == NULL)) {
 		Status = XTRNGPSX_INVALID_SEED_VALUE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((Seed != NULL) && (InstancePtr->UserCfg.Mode == XTRNGPSX_HRNG_MODE)) {
 		Status = XTRNGPSX_INVALID_SEED_VALUE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((DLen < XTRNGPSX_DF_MIN_LENGTH) || (DLen > XTRNGPSX_DF_MAX_LENGTH)) {
 		Status = XTRNGPSX_INVALID_DF_LENGTH;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if (InstancePtr->UserCfg.Mode == XTRNGPSX_PTRNG_MODE) {
 		Status = XTRNGPSX_INVALID_MODE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if (InstancePtr->State == XTRNGPSX_UNINITIALIZED_STATE) {
 		Status = XTRNGPSX_INVALID_STATE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr->ErrorState != XTRNGPSX_HEALTHY) &&
 		(InstancePtr->ErrorState != XTRNGPSX_STARTUP_TEST)) {
 		Status = XTRNGPSX_UNHEALTHY_STATE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	/* Wait for reseed operation and check CTF flag */
 	if ((InstancePtr->State == XTRNGPSX_RESEED_STATE) && (InstancePtr->UserCfg.IsBlocking != TRUE)) {
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, XTrngpsx_WaitForReseed, InstancePtr);
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	XTRNGPSX_TEMPORAL_CHECK(END, Status, XTrngpsx_ReseedInternal, InstancePtr,
 		Seed, DLen, NULL, InstancePtr->UserCfg.IsBlocking);
-	IMSG("%s %d\n", __func__, __LINE__);
 
 END:
-	IMSG("%s %d\n", __func__, __LINE__);
 	return Status;
 }
 
@@ -745,17 +708,13 @@ END:
  **************************************************************************************************/
 int XTrngpsx_Generate(XTrngpsx_Instance *InstancePtr, u8 *RandBuf, u32 RandBufSize, u8 PredResistance) {
 	volatile int Status = XST_FAILURE;
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr == NULL) || (RandBuf == NULL)) {
 		Status = XTRNGPSX_INVALID_PARAM;
-		IMSG("%s %d\n", __func__, __LINE__);
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr->UserCfg.Mode == XTRNGPSX_PTRNG_MODE) &&
 		(InstancePtr->State != XTRNGPSX_INSTANTIATE_STATE) &&
 		(InstancePtr->State != XTRNGPSX_GENERATE_STATE)) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		Status = XTRNGPSX_INVALID_STATE;
 		goto END;
 	}
@@ -763,57 +722,43 @@ int XTrngpsx_Generate(XTrngpsx_Instance *InstancePtr, u8 *RandBuf, u32 RandBufSi
 	if ((InstancePtr->UserCfg.Mode != XTRNGPSX_PTRNG_MODE) &&
 		(InstancePtr->State != XTRNGPSX_RESEED_STATE) &&
 		(InstancePtr->State != XTRNGPSX_GENERATE_STATE)) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		Status = XTRNGPSX_INVALID_STATE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((RandBufSize == 0U) || (RandBufSize > XTRNGPSX_SEC_STRENGTH_IN_BYTES) ||
 		((RandBufSize % XTRNGPSX_WORD_LEN_IN_BYTES) != 0U)) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		Status = XTRNGPSX_INVALID_BUF_SIZE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((PredResistance != TRUE) && (PredResistance != FALSE)) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		Status = XTRNG_PSX_INVALID_PREDRES_VALUE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr->UserCfg.Mode == XTRNGPSX_PTRNG_MODE) && (PredResistance == TRUE)) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		Status = XTRNG_PSX_INVALID_PREDRES_VALUE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr->ErrorState != XTRNGPSX_HEALTHY) &&
 		(InstancePtr->ErrorState != XTRNGPSX_STARTUP_TEST)) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		Status = XTRNGPSX_UNHEALTHY_STATE;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((InstancePtr->UserCfg.Mode == XTRNGPSX_DRNG_MODE) ||
 		(InstancePtr->UserCfg.Mode == XTRNGPSX_HRNG_MODE)) {
 		if (InstancePtr->UserCfg.Mode == XTRNGPSX_DRNG_MODE) {
 			if ((PredResistance == TRUE) &&
 				(InstancePtr->Stats.ElapsedSeedLife > 0U)) {
-				IMSG("%s %d\n", __func__, __LINE__);
 				Status = XTRNGPSX_RESEED_REQUIRED_ERROR;
 				goto END;
 			}
 		}
 		/* Wait for reseed operation and check CTF flag */
-		IMSG("%s %d\n", __func__, __LINE__);
 		if ((InstancePtr->State == XTRNGPSX_RESEED_STATE) && (InstancePtr->UserCfg.IsBlocking != TRUE)) {
 			XTRNGPSX_TEMPORAL_CHECK(END, Status, XTrngpsx_WaitForReseed, InstancePtr);
 		}
-		IMSG("%s %d\n", __func__, __LINE__);
 		InstancePtr->UserCfg.PredResistance = PredResistance;
 	}
 	else if (InstancePtr->UserCfg.Mode == XTRNGPSX_PTRNG_MODE) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		/* Enable ring oscillators for random seed source */
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_OSC_EN),
 			TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
@@ -822,7 +767,6 @@ int XTrngpsx_Generate(XTrngpsx_Instance *InstancePtr, u8 *RandBuf, u32 RandBufSi
 			TRNG_CTRL_TRSSEN_MASK | TRNG_CTRL_EUMODE_MASK |
 			TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK |
 			TRNG_CTRL_EUMODE_MASK);
-			IMSG("%s %d\n", __func__, __LINE__);
 	}
 	else {
 		Status = XTRNGPSX_INVALID_MODE;
@@ -926,14 +870,12 @@ static int XTrngpsx_ReseedInternal(XTrngpsx_Instance *InstancePtr, const u8 *See
 		const u8 *PerStr, const u8 IsBlocking) {
 	volatile int Status = XST_FAILURE;
 	u32 PersMask = TRNG_CTRL_PERSODISABLE_MASK;
-	IMSG("%s %d\n", __func__, __LINE__);
 	dump_XTrngpsx_UserConfig(InstancePtr->UserCfg);
 	/* Configure DF Len */
 	Status = XTrngpsx_CfgDfLen(InstancePtr, DLen);
 	if (Status != XST_SUCCESS) {
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if (PerStr != NULL) {
 		Status = XST_FAILURE;
 		Status = XTrngpsx_WritePersString(InstancePtr, PerStr);
@@ -942,79 +884,46 @@ static int XTrngpsx_ReseedInternal(XTrngpsx_Instance *InstancePtr, const u8 *See
 		}
 		PersMask = TRNG_CTRL_PERSODISABLE_DEFVAL;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
-
-	//Trying to dump seed and perstr
-	// int i;
-	// IMSG("Seed");
-	// for(i = 0; i < 128U; i++)
-	// {
-	// 	IMSG("0x%08" PRIx32, Seed[i]);
-	// }
-
-	// if (PerStr != NULL) {
-	// 	IMSG("PerStr");
-	// 	for(i = 0; i < 48U; i++)
-	// 	{
-	// 		IMSG("0x%08" PRIx32, PerStr[i]);
-	// 	}
-	// }
 
 	XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
 		TRNG_CTRL_PERSODISABLE_MASK | TRNG_CTRL_PRNGSTART_MASK, PersMask);
-		IMSG("%s %d\n", __func__, __LINE__);
 	/* DRNG Mode */
 	if (Seed != NULL) {
 		/* Enable TST mode and set PRNG mode for reseed operation*/
-		IMSG("%s %d\n", __func__, __LINE__);
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
 			TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TSTMODE_MASK |
 			TRNG_CTRL_TRSSEN_MASK, TRNG_CTRL_TSTMODE_MASK |
 			TRNG_CTRL_TRSSEN_MASK);
-		IMSG("%s %d\n", __func__, __LINE__);
 		/* Start reseed operation */
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
 			TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
-		IMSG("%s %d\n", __func__, __LINE__);
 		/* For writing seed as an input to DF, PRNG start needs to be set */
 		IMSG("mul/DLen = %d", DLen);
 		XTRNGPSX_TEMPORAL_CHECK(END,Status, XTrngpsx_WriteSeed, InstancePtr, Seed,
 			DLen);
-		IMSG("%s %d\n", __func__, __LINE__);
 	}
 	else { /* HTRNG Mode */
 		/* Enable ring oscillators for random seed source */
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_OSC_EN),
 			TRNG_OSC_EN_VAL_MASK, TRNG_OSC_EN_VAL_MASK);
-		IMSG("%s %d\n", __func__, __LINE__);
 		/* Enable TRSSEN and set PRNG mode for reseed operation */
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
 			TRNG_CTRL_PRNGMODE_MASK | TRNG_CTRL_TRSSEN_MASK |
 			TRNG_CTRL_PRNGXS_MASK, TRNG_CTRL_TRSSEN_MASK);
-		IMSG("%s %d\n", __func__, __LINE__);
 		/* Start reseed operation */
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, Xil_SecureRMW32, (InstancePtr->Config.BaseAddress + TRNG_CTRL),
 			TRNG_CTRL_PRNGSTART_MASK, TRNG_CTRL_PRNGSTART_MASK);
-		IMSG("%s %d\n", __func__, __LINE__);
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if (IsBlocking == TRUE) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		XTRNGPSX_TEMPORAL_CHECK(END, Status, XTrngpsx_WaitForReseed, InstancePtr);
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	InstancePtr->State = XTRNGPSX_RESEED_STATE;
-	IMSG("%s %d\n", __func__, __LINE__);
 	Status = XST_SUCCESS;
-	IMSG("%s %d\n", __func__, __LINE__);
 	InstancePtr->Stats.ElapsedSeedLife = 0U;
-	IMSG("%s %d\n", __func__, __LINE__);
 END:
 	if ((Status != XST_SUCCESS) && (InstancePtr->ErrorState != XTRNGPSX_CATASTROPHIC)) {
-		IMSG("%s %d\n", __func__, __LINE__);
 		InstancePtr->ErrorState = XTRNGPSX_ERROR;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	return Status;
 }
 
@@ -1035,7 +944,6 @@ static int XTrngpsx_WaitForReseed(XTrngpsx_Instance *InstancePtr) {
 	volatile int Status = XST_FAILURE;
 	volatile int StatusTmp = XST_FAILURE;
 
-	IMSG("%s %d\n", __func__, __LINE__);
 	XTRNGPSX_TEMPORAL_IMPL(Status, StatusTmp, wait_for_event,
 		   (UINTPTR)(InstancePtr->Config.BaseAddress + TRNG_STATUS),
 			TRNG_STATUS_DONE_MASK, TRNG_STATUS_DONE_MASK,
@@ -1044,20 +952,16 @@ static int XTrngpsx_WaitForReseed(XTrngpsx_Instance *InstancePtr) {
 		Status = XTRNGPSX_TIMEOUT_ERROR;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	if ((Xil_In32(InstancePtr->Config.BaseAddress + TRNG_STATUS) & TRNG_STATUS_CERTF_MASK) ==
 			TRNG_STATUS_CERTF_MASK) {
 		InstancePtr->ErrorState = XTRNGPSX_CATASTROPHIC;
 		Status = XTRNGPSX_CATASTROPHIC_CTF_ERROR;
 		goto END;
 	}
-	IMSG("%s %d\n", __func__, __LINE__);
 	Status = XTrngpsx_UtilRMW32((InstancePtr->Config.BaseAddress + TRNG_CTRL), TRNG_CTRL_PRNGSTART_MASK |
 			TRNG_CTRL_TRSSEN_MASK, 0U);
-	IMSG("%s %d\n", __func__, __LINE__);
 	
 END:
-	IMSG("%s %d\n", __func__, __LINE__);
 	return Status;
 }
 
