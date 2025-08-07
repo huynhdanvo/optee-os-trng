@@ -89,21 +89,6 @@ static int XTrngpsx_CfgAdaptPropTestCutoff(XTrngpsx_Instance *InstancePtr, u16 A
 static int XTrngpsx_CfgRepCountTestCutoff(XTrngpsx_Instance *InstancePtr, u16 RepCountTestCutoff);
 static int XTrngpsx_CfgDIT(XTrngpsx_Instance *InstancePtr, u8 DITValue);
 
-static uint32_t trng_read32(vaddr_t addr, size_t off)
-{
-	return io_read32(addr + off);
-}
-
-static void trng_write32(vaddr_t addr, size_t off, uint32_t val)
-{
-	io_write32(addr + off, val);
-}
-
-static void trng_clrset32(vaddr_t addr, size_t off, uint32_t mask, uint32_t val)
-{
-	io_clrsetbits32(addr + off, mask, mask & val);
-}
-
 static int wait_for_event(vaddr_t reg, uint32_t mask, uint32_t expected, uint32_t timeout)
 {
 	uint32_t val;
@@ -117,6 +102,7 @@ static int wait_for_event(vaddr_t reg, uint32_t mask, uint32_t expected, uint32_
 	return -1;
 }
 
+__maybe_unused
 static void dump_XTrngpsx_UserConfig(XTrngpsx_UserConfig conf){
 	IMSG("Mode = %d",conf.Mode);
 	IMSG("SeedLife = %d",conf.SeedLife);
@@ -355,8 +341,6 @@ static int XTrngpsx_PrngReset(XTrngpsx_Instance *InstancePtr) {
 static int XTrngpsx_CfgDfLen(XTrngpsx_Instance *InstancePtr, u8 DfLen) {
 	int Status = XST_FAILURE;
 
-	IMSG("TRNG_CTRL_3_DLEN_MASK = 0x%08" PRIx32, TRNG_CTRL_3_DLEN_MASK);
-	IMSG("(DfLen << TRNG_CTRL_3_DLEN_SHIFT) = 0x%08" PRIx32, (DfLen << TRNG_CTRL_3_DLEN_SHIFT));
 	Status = XTrngpsx_UtilRMW32((InstancePtr->Config.BaseAddress + TRNG_CTRL_3), TRNG_CTRL_3_DLEN_MASK,
 		(DfLen << TRNG_CTRL_3_DLEN_SHIFT));
 
@@ -870,7 +854,7 @@ static int XTrngpsx_ReseedInternal(XTrngpsx_Instance *InstancePtr, const u8 *See
 		const u8 *PerStr, const u8 IsBlocking) {
 	volatile int Status = XST_FAILURE;
 	u32 PersMask = TRNG_CTRL_PERSODISABLE_MASK;
-	dump_XTrngpsx_UserConfig(InstancePtr->UserCfg);
+	// dump_XTrngpsx_UserConfig(InstancePtr->UserCfg);
 	/* Configure DF Len */
 	Status = XTrngpsx_CfgDfLen(InstancePtr, DLen);
 	if (Status != XST_SUCCESS) {
@@ -983,7 +967,7 @@ END:
 static int XTrngpsx_CollectRandData(XTrngpsx_Instance *InstancePtr, u8 *RandBuf, u32 RandBufSize) {
 	volatile int Status = XST_FAILURE;
 	volatile int StatusTmp = XST_FAILURE;
-	volatile int SStatus = XST_FAILURE;
+	// volatile int SStatus = XST_FAILURE;
 	u8 Idx = 0U;
 	volatile u8 NumofBursts = 0U;
 	u8 BurstIdx = 0U;
@@ -1039,10 +1023,10 @@ static int XTrngpsx_CollectRandData(XTrngpsx_Instance *InstancePtr, u8 *RandBuf,
 
 END:
 	if (Status != XST_SUCCESS) {
-		SStatus = memset(RandBuf, 0U, RandBufSize);
-		if (SStatus != XST_SUCCESS) {
-			Status |= SStatus;
-		}
+		memset(RandBuf, 0U, RandBufSize);
+		// if (SStatus != XST_SUCCESS) {
+		// 	Status |= SStatus;
+		// }
 	}
 
 	return Status;
