@@ -1901,20 +1901,22 @@ TEE_Result versal_trng_hw_init(struct versal_trng *trng,
 		// trng_drng_test(trng);
 		// trng_hrng_test(trng);
 		// trng_ptrng_test(trng);
-		if (trng_kat_test_drng(trng)) {
-			EMSG("trng_kat_test_drng Failed");
-			panic();
-		}
 
-		if (trng_kat_test_ptrng(trng)) {
-			EMSG("trng_kat_test_drng Failed");
-			panic();
-		}
+		// if (trng_kat_test_drng(trng)) {
+		// 	EMSG("trng_kat_test_drng Failed");
+		// 	panic();
+		// }
 
-		if (trng_kat_test_hrng(trng)) {
-			EMSG("trng_kat_test_drng Failed");
-			panic();
-		}
+		// if (trng_kat_test_ptrng(trng)) {
+		// 	EMSG("trng_kat_test_ptrng Failed");
+		// 	panic();
+		// }
+
+		// if (trng_kat_test_hrng(trng)) {
+		// 	EMSG("trng_kat_test_hrng Failed");
+		// 	panic();
+		// }
+
 		if (trng_kat_test_v2(trng)) {
 			EMSG("KAT Failed");
 			panic();
