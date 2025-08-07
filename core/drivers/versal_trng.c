@@ -1729,12 +1729,12 @@ TEE_Result versal_trng_hw_init(struct versal_trng *trng,
 		break;
 
 	case TRNG_V2:
-		// trng_drng_test(trng);
-		// trng_hrng_test(trng);
-		// trng_ptrng_test(trng);
-		if (trng_kat_test_ptrng(trng)) {
+		trng_drng_test(trng);
+		trng_hrng_test(trng);
+		trng_ptrng_test(trng);
+		// if (trng_kat_test_ptrng(trng)) {
 		// if (trng_kat_test_hrng(trng)) {
-		// if (trng_kat_test_v2(trng)) {
+		if (trng_kat_test_v2(trng)) {
 			EMSG("KAT Failed");
 			panic();
 		}

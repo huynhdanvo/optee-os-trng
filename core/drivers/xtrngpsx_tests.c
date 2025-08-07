@@ -223,17 +223,17 @@ int XTrngpsx_PreOperationalSelfTests(XTrngpsx_Instance *InstancePtr) {
 	volatile int Status = XST_FAILURE;
 
 	/* Reset the TRNG state */
-	// Status = XTrngpsx_Uninstantiate(InstancePtr);
-	// if (Status != XST_SUCCESS) {
-	// 	goto END;
-	// }
+	Status = XTrngpsx_Uninstantiate(InstancePtr);
+	if (Status != XST_SUCCESS) {
+		goto END;
+	}
 	
 	Status = XTrngpsx_DRBGKat(InstancePtr);
 	if (Status != XST_SUCCESS) {
 		goto END;
 	}
 	
-	// Status = XTrngpsx_HealthTest(InstancePtr);
+	Status = XTrngpsx_HealthTest(InstancePtr);
 
 END:
 	return Status;
