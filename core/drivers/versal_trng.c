@@ -180,6 +180,19 @@ static unsigned char sbx3[256];
 static unsigned char schedule[BLK_SIZE * (MAX_ROUNDS + 1)];
 static unsigned int rounds;
 
+static void trng_printbytes(uint8_t *src, uint32_t size)
+{
+	uint32_t index;
+
+	for (index = 0; index < size; index++) {
+		if (index % 16 == 0) {
+			IMSG("\n\r");
+		}
+		IMSG("0x%02X, ", src[index]);
+	}
+	IMSG("\n\r");
+}
+
 static void rota4(uint8_t *a, uint8_t *b, uint8_t *c, uint8_t *d)
 {
 	uint8_t t = *a;
@@ -1557,6 +1570,67 @@ error:
 	return TEE_ERROR_GENERIC;
 }
 
+static TEE_Result trng_kat_test_hrng(struct versal_trng *trng)
+{
+	const uint8_t pers_str[TRNG_PERS_STR_LEN] = {
+		0xB2U, 0x80U, 0x7EU, 0x4CU, 0xD0U, 0xE4U, 0xE2U, 0xA9U,
+		0x2FU, 0x1FU, 0x5DU, 0xC1U, 0xA2U, 0x1FU, 0x40U, 0xFCU,
+		0x1FU, 0x24U, 0x5DU, 0x42U, 0x61U, 0x80U, 0xE6U, 0xE9U,
+		0x71U, 0x05U, 0x17U, 0x5BU, 0xAFU, 0x70U, 0x30U, 0x18U,
+		0xBCU, 0x23U, 0x18U, 0x15U, 0xCBU, 0xB8U, 0xA6U, 0x3EU,
+		0x83U, 0xB8U, 0x4AU, 0xFEU, 0x38U, 0xFCU, 0x25U, 0x87U,
+	};
+
+	struct trng_usr_cfg tests = {
+		.mode = TRNG_DRNG,
+		.seed_life = 2,
+		.dfmul = 7,
+		.predict_en = false,
+		.iseed_en = true,
+		.pstr_en = true,
+		.df_disable = false,
+	};
+
+	uint8_t out[TRNG_GEN_LEN] = { 0 };
+	memcpy(tests.pstr, pers_str, sizeof(pers_str));
+
+	if(trng_kat_test_v2(trng))
+	{
+		return TEE_ERROR_GENERIC;
+	}
+
+	tests.mode = TRNG_HRNG;
+	tests.iseed_en = false;
+	tests.seed_life = 256;
+
+	/* Instantiate to complete initialization and for (initial) reseeding */
+	if (trng_instantiate(trng, &tests))
+		goto error;
+		
+	if (trng_reseed(trng, NULL, 7))
+		goto error;
+
+	if (trng_generate(trng, out, sizeof(out), false))
+		goto error;
+
+	IMSG("Generate 1 Random data:\n\r");
+	trng_printbytes(out, sizeof(out));
+
+	if (trng_generate(trng, out, sizeof(out), false))
+		goto error;
+
+	IMSG("Generate 2 Random data:\n\r");
+	trng_printbytes(out, sizeof(out));
+
+	if (trng_release(trng))
+		goto error;
+
+	return TEE_SUCCESS;
+error:
+	trng->status = TRNG_ERROR;
+	return TEE_ERROR_GENERIC;
+}
+
 TEE_Result versal_trng_get_random_bytes(struct versal_trng *trng,
 					void *buf, size_t len)
 {
@@ -1604,7 +1678,8 @@ TEE_Result versal_trng_hw_init(struct versal_trng *trng,
 		// trng_drng_test(trng);
 		// trng_hrng_test(trng);
 		// trng_ptrng_test(trng);
-		if (trng_kat_test_v2(trng)) {
+		if (trng_kat_test_hrng(trng)) {
+		// if (trng_kat_test_v2(trng)) {
 			EMSG("KAT Failed");
 			panic();
 		}
