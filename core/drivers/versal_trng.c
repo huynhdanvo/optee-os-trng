@@ -1570,6 +1570,60 @@ error:
 	return TEE_ERROR_GENERIC;
 }
 
+__maybe_unused
+static TEE_Result trng_kat_test_ptrng(struct versal_trng *trng)
+{
+	struct trng_usr_cfg tests = {
+		.mode = TRNG_DRNG,
+		.seed_life = 2,
+		.dfmul = 7,
+		.predict_en = false,
+		.iseed_en = true,
+		.pstr_en = true,
+		.df_disable = false,
+	};
+
+	uint8_t out[TRNG_GEN_LEN] = { 0 };
+
+	if(trng_kat_test_v2(trng))
+	{
+		return TEE_ERROR_GENERIC;
+	}
+
+	tests.mode = TRNG_HRNG;
+	tests.iseed_en = false;
+	tests.pstr_en = false;
+	tests.seed_life = 256;
+
+	/* Instantiate to complete initialization and for (initial) reseeding */
+	if (trng_instantiate(trng, &tests))
+		goto error;
+		
+	if (trng_reseed(trng, NULL, 7))
+		goto error;
+
+	if (trng_generate(trng, out, sizeof(out), false))
+		goto error;
+
+	IMSG("Generate 1 Random data:\n\r");
+	trng_printbytes(out, sizeof(out));
+
+	if (trng_generate(trng, out, sizeof(out), false))
+		goto error;
+
+	IMSG("Generate 2 Random data:\n\r");
+	trng_printbytes(out, sizeof(out));
+
+	if (trng_release(trng))
+		goto error;
+
+	return TEE_SUCCESS;
+error:
+	trng->status = TRNG_ERROR;
+	return TEE_ERROR_GENERIC;
+}
+
+__maybe_unused
 static TEE_Result trng_kat_test_hrng(struct versal_trng *trng)
 {
 	const uint8_t pers_str[TRNG_PERS_STR_LEN] = {
@@ -1678,7 +1732,8 @@ TEE_Result versal_trng_hw_init(struct versal_trng *trng,
 		// trng_drng_test(trng);
 		// trng_hrng_test(trng);
 		// trng_ptrng_test(trng);
-		if (trng_kat_test_hrng(trng)) {
+		if (trng_kat_test_ptrng(trng)) {
+		// if (trng_kat_test_hrng(trng)) {
 		// if (trng_kat_test_v2(trng)) {
 			EMSG("KAT Failed");
 			panic();
